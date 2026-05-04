@@ -445,11 +445,15 @@ function renderUsers(users) {
     row.elements.displayName.value = user.displayName || "";
     row.elements.role.value = user.role;
     row.elements.status.value = user.status;
+    row.elements.dailyText.value = user.quota?.dailyText ?? 100;
+    row.elements.dailyImage.value = user.quota?.dailyImage ?? 10;
+    row.querySelector('[data-field="quota"]').textContent = quotaLabel(user);
 
     row.addEventListener("submit", async (event) => {
       event.preventDefault();
       const data = new FormData(row);
       const payload = Object.fromEntries(data);
+      payload.resetUsage = data.get("resetUsage") === "on";
       const result = await api(`/api/admin/users/${encodeURIComponent(user.id)}`, {
         method: "PUT",
         body: JSON.stringify(payload)
@@ -482,6 +486,19 @@ function renderUsers(users) {
 
     usersTable.append(row);
   });
+}
+
+function quotaLabel(user) {
+  const quota = user.quota || {};
+  const usage = user.usage || {};
+  const textLimit = formatLimit(quota.dailyText);
+  const imageLimit = formatLimit(quota.dailyImage);
+  return `今日文本 ${usage.text || 0}/${textLimit} · 图片 ${usage.image || 0}/${imageLimit}`;
+}
+
+function formatLimit(value) {
+  const limit = Number(value);
+  return limit < 0 ? "不限" : String(Number.isFinite(limit) ? limit : 0);
 }
 
 function providerPayload(data) {

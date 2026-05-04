@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MinAI Admin</title>
     <link rel="icon" href="/assets/ai-avatar.png" />
-    <link rel="stylesheet" href="/admin.css?v=20260503-chatbox2" />
+    <link rel="stylesheet" href="/admin.css?v=20260504-actions-quota" />
   </head>
   <body>
     <main class="admin-shell">
@@ -162,6 +162,8 @@
               <option value="user">用户</option>
               <option value="admin">管理员</option>
             </select>
+            <input name="dailyText" type="number" min="-1" placeholder="每日文本额度" value="100" />
+            <input name="dailyImage" type="number" min="-1" placeholder="每日图片额度" value="10" />
             <button type="submit">添加</button>
           </form>
           <p class="form-message" id="usersMessage"></p>
@@ -186,7 +188,14 @@
           <option value="active">启用</option>
           <option value="disabled">禁用</option>
         </select>
+        <input name="dailyText" type="number" min="-1" placeholder="每日文本额度" />
+        <input name="dailyImage" type="number" min="-1" placeholder="每日图片额度" />
         <input name="password" type="password" placeholder="新密码" minlength="8" />
+        <label class="reset-usage">
+          <input name="resetUsage" type="checkbox" />
+          <span>重置今日用量</span>
+        </label>
+        <div class="quota-meta" data-field="quota"></div>
         <div class="row-actions">
           <button type="submit">保存</button>
           <button type="button" class="ghost-button delete-user">删除</button>
@@ -244,6 +253,6 @@
       </form>
     </template>
 
-    <script src="/admin.js?v=20260504-model-access" type="module"></script>
+    <script src="/admin.js?v=20260504-actions-quota" type="module"></script>
   </body>
 </html>

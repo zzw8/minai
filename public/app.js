@@ -45,6 +45,7 @@ let pendingFiles = [];
 let currentTheme = localStorage.getItem(THEME_STORAGE_KEY) || preferredTheme();
 let sidebarCollapsed = localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true";
 let lastSavedMessagesSignature = messageSignature(messages);
+let activeAbortController = null;
 let config = {
   siteTitle: "MinAI",
   requireLogin: false,
@@ -81,6 +82,12 @@ form.addEventListener("submit", async (event) => {
   addLocalMessage("user", userMessage.content, false, [], userMessage.files || []);
 
   await sendMessage();
+});
+
+sendButton.addEventListener("click", (event) => {
+  if (!isSending) return;
+  event.preventDefault();
+  stopGeneration();
 });
 
 input.addEventListener("input", resizeInput);
@@ -174,6 +181,19 @@ attachmentTray.addEventListener("click", (event) => {
   renderPendingFiles();
 });
 
+messagesEl.addEventListener("click", async (event) => {
+  const copyButton = event.target.closest("[data-copy-message]");
+  if (copyButton) {
+    await copyAssistantMessage(Number(copyButton.dataset.copyMessage), copyButton);
+    return;
+  }
+
+  const regenerateButton = event.target.closest("[data-regenerate-message]");
+  if (regenerateButton) {
+    await regenerateAssistantMessage(Number(regenerateButton.dataset.regenerateMessage));
+  }
+});
+
 authButton.addEventListener("click", () => {
   if (!config.user) {
     showAuthModal();
@@ -251,11 +271,13 @@ async function bootstrap() {
 }
 
 async function sendMessage() {
+  if (isSending) return;
+
+  const controller = new AbortController();
+  activeAbortController = controller;
   setSending(true);
   const imageRequest = isImageModel(activeModelText());
-  const typingEl = addTypingMessage(
-    imageRequest ? "图片生成中，可能需要几分钟，请保持页面打开。" : ""
-  );
+  const typingEl = addTypingMessage(imageRequest ? "图片生成中，可能需要几分钟，请保持页面打开。" : "");
   let statusTimer = imageRequest ? startGenerationStatus(typingEl) : null;
 
   const removeTyping = () => {
@@ -270,14 +292,19 @@ async function sendMessage() {
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId: currentConversationId, messages, model: selectedModel || undefined })
+      body: JSON.stringify({
+        conversationId: currentConversationId,
+        messages: requestMessages(),
+        model: selectedModel || undefined
+      }),
+      signal: controller.signal
     });
 
     const data = await response.json().catch(() => ({}));
 
     if (response.status === 401) {
       removeTyping();
-      addLocalMessage("assistant", data.error || "请先登录后再使用。", true);
+      addAssistantError(data.error || "请先登录后再使用。");
       await saveMessages(true).catch(() => null);
       showAuthModal();
       return;
@@ -285,24 +312,28 @@ async function sendMessage() {
 
     if (!response.ok) {
       removeTyping();
-      addLocalMessage("assistant", data.error || "请求失败，请稍后再试。", true);
+      addAssistantError(data.error || "请求失败，请稍后再试。");
       await saveMessages(true).catch(() => null);
       return;
     }
 
-    const result = data.jobId ? await pollImageJob(data.jobId, typingEl) : data;
+    const result = data.jobId ? await pollImageJob(data.jobId, typingEl, controller.signal) : data;
     removeTyping();
 
     if (result.status === "failed") {
-      addLocalMessage("assistant", result.error || "图片生成失败，请稍后再试。", true);
+      addAssistantError(result.error || "图片生成失败，请稍后再试。");
       await saveMessages(true).catch(() => null);
       return;
     }
 
     const assistantMessage = { role: "assistant", content: result.reply || "没有收到有效回复。", images: result.images || [] };
-    await typeAssistantMessage(assistantMessage);
-    messages.push(assistantMessage);
+    const typed = await typeAssistantMessage(assistantMessage, messages.length, controller.signal);
+    messages.push({ ...assistantMessage, content: typed.content });
     if (result.conversationId) currentConversationId = result.conversationId;
+    if (typed.stopped) {
+      await saveMessages(true);
+      return;
+    }
     if (Array.isArray(result.conversations)) {
       conversations = result.conversations;
       renderConversationList();
@@ -313,10 +344,13 @@ async function sendMessage() {
     }
   } catch (error) {
     removeTyping();
-    addLocalMessage("assistant", error?.message || "网络连接失败，请检查服务器配置。", true);
-    await saveMessages(true).catch(() => null);
+    if (!isAbortError(error)) {
+      addAssistantError(error?.message || "网络连接失败，请检查服务器配置。");
+      await saveMessages(true).catch(() => null);
+    }
   } finally {
     if (statusTimer) clearInterval(statusTimer);
+    if (activeAbortController === controller) activeAbortController = null;
     setSending(false);
   }
 }
@@ -341,8 +375,8 @@ function renderMessages() {
   }
 
   const fragment = document.createDocumentFragment();
-  messages.forEach((message) =>
-    addMessageElement(message.role, message.content, false, message.images || [], message.files || [], fragment)
+  messages.forEach((message, index) =>
+    addMessageElement(message.role, message.content, Boolean(message.error), message.images || [], message.files || [], fragment, index)
   );
   messagesEl.append(fragment);
   scrollToBottom();
@@ -394,12 +428,19 @@ function renderConversationList() {
   conversationList.append(fragment);
 }
 
-function addLocalMessage(role, content, isError = false, images = [], files = []) {
-  addMessageElement(role, content, isError, images, files);
+function addLocalMessage(role, content, isError = false, images = [], files = [], messageIndex = -1) {
+  const node = addMessageElement(role, content, isError, images, files, messagesEl, messageIndex);
   scrollToBottom();
+  return node;
 }
 
-function addMessageElement(role, content, isError = false, images = [], files = [], target = messagesEl) {
+function addAssistantError(content) {
+  const message = { role: "assistant", content, error: true };
+  messages.push(message);
+  return addLocalMessage("assistant", content, true, [], [], messages.length - 1);
+}
+
+function addMessageElement(role, content, isError = false, images = [], files = [], target = messagesEl, messageIndex = -1) {
   const node = template.content.firstElementChild.cloneNode(true);
   node.classList.add(role);
   if (isError) node.classList.add("error");
@@ -433,8 +474,37 @@ function addMessageElement(role, content, isError = false, images = [], files = 
       bubble.append(gallery);
     }
   }
+  if (role === "assistant" && messageIndex >= 0) {
+    appendMessageActions(node, { role, content, images, error: isError }, messageIndex);
+  }
   target.append(node);
   return node;
+}
+
+function appendMessageActions(node, message, messageIndex) {
+  const bubble = node.querySelector(".bubble");
+  if (!bubble) return;
+
+  const actions = document.createElement("div");
+  actions.className = "message-actions";
+
+  if (String(message.content || "").trim()) {
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.dataset.copyMessage = String(messageIndex);
+    copy.title = "复制回答";
+    copy.textContent = "复制";
+    actions.append(copy);
+  }
+
+  const regenerate = document.createElement("button");
+  regenerate.type = "button";
+  regenerate.dataset.regenerateMessage = String(messageIndex);
+  regenerate.title = message.error ? "重试这次请求" : "重新生成回答";
+  regenerate.textContent = message.error ? "重试" : "重新生成";
+  actions.append(regenerate);
+
+  bubble.append(actions);
 }
 
 function addTypingMessage(statusText = "") {
@@ -469,13 +539,13 @@ function startGenerationStatus(node) {
   }, 30000);
 }
 
-async function pollImageJob(jobId, typingEl) {
+async function pollImageJob(jobId, typingEl, signal) {
   const startedAt = Date.now();
   let delay = 2500;
 
   while (Date.now() - startedAt < 32 * 60 * 1000) {
-    await wait(delay);
-    const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
+    await wait(delay, signal);
+    const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`, { signal });
     const data = await response.json().catch(() => ({}));
 
     if (response.status === 401) {
@@ -501,36 +571,48 @@ async function pollImageJob(jobId, typingEl) {
   };
 }
 
-async function typeAssistantMessage(message) {
+async function typeAssistantMessage(message, messageIndex, signal) {
   const node = addMessageElement("assistant", "", false, [], []);
   const bubble = node.querySelector(".bubble");
   const text = String(message.content || "");
   const chunkSize = text.length > 900 ? 10 : text.length > 500 ? 7 : text.length > 220 ? 4 : 2;
   let lastScrollAt = 0;
   for (let index = 0; index < text.length; index += chunkSize) {
+    if (signal?.aborted) break;
     bubble.textContent = text.slice(0, index + chunkSize);
     if (performance.now() - lastScrollAt > 90) {
       scrollToBottom();
       lastScrollAt = performance.now();
     }
-    await wait(text.length > 500 ? 8 : 12);
+    await wait(text.length > 500 ? 8 : 12, signal).catch((error) => {
+      if (!isAbortError(error)) throw error;
+    });
+    if (signal?.aborted) break;
   }
-  bubble.textContent = text;
-  appendImageGallery(bubble, message.images, "AI 生成图片");
+
+  const stopped = Boolean(signal?.aborted);
+  const finalContent = stopped ? bubble.textContent : text;
+  bubble.textContent = finalContent;
+  if (!stopped) appendImageGallery(bubble, message.images, "AI 生成图片");
+  appendMessageActions(node, { ...message, content: finalContent }, messageIndex);
   scrollToBottom();
+  return { content: finalContent, stopped };
 }
 
 function appendImageGallery(container, images, altText) {
   if (!Array.isArray(images) || !images.length) return;
   const gallery = document.createElement("div");
   gallery.className = "image-gallery";
-  images.forEach((url) => {
+  images.forEach((url, index) => {
     if (typeof url !== "string" || !url.trim()) return;
-    const item = document.createElement("a");
-    item.href = url;
-    item.target = "_blank";
-    item.rel = "noopener";
+    const item = document.createElement("div");
     item.className = "image-item";
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.title = "打开原图";
 
     const image = document.createElement("img");
     image.src = url;
@@ -541,12 +623,20 @@ function appendImageGallery(container, images, altText) {
       "error",
       () => {
         item.classList.add("image-load-error");
-        item.textContent = "图片加载失败，点此打开原图";
+        link.textContent = "图片加载失败，点此打开原图";
       },
       { once: true }
     );
 
-    item.append(image);
+    const download = document.createElement("a");
+    download.href = url;
+    download.download = imageDownloadName(url, index);
+    download.className = "image-download";
+    download.textContent = "下载";
+    download.addEventListener("click", (event) => event.stopPropagation());
+
+    link.append(image);
+    item.append(link, download);
     gallery.append(item);
   });
   if (gallery.children.length) container.append(gallery);
@@ -617,10 +707,11 @@ function hideAccountMenu() {
 function updateInputState() {
   const locked = !canUseChat();
   input.disabled = isSending || locked;
-  sendButton.disabled = isSending || locked;
+  sendButton.disabled = locked;
   attachButton.disabled = isSending || locked;
   modelSelect.disabled = isSending || locked || modelSelect.options.length <= 1;
   input.placeholder = locked ? "请先登录..." : "输入你的问题...";
+  sendButton.title = isSending ? "停止生成" : "发送";
 }
 
 function canUseChat() {
@@ -644,6 +735,7 @@ function resizeInput() {
 
 function setSending(value) {
   isSending = value;
+  form.classList.toggle("is-sending", value);
   updateInputState();
 }
 
@@ -709,8 +801,75 @@ function normalizeModelId(modelId) {
   return MODEL_ALIASES[cleaned.toLowerCase()] || cleaned;
 }
 
+function requestMessages() {
+  return sanitizeMessages(messages).filter((message) => !message.error);
+}
+
 function messageSignature(source) {
   return JSON.stringify(sanitizeMessages(source));
+}
+
+function stopGeneration() {
+  activeAbortController?.abort();
+}
+
+async function copyAssistantMessage(messageIndex, button) {
+  const message = messages[messageIndex];
+  if (!message || message.role !== "assistant") return;
+  const text = String(message.content || "").trim();
+  if (!text) return;
+
+  await copyText(text);
+  const previous = button.textContent;
+  button.textContent = "已复制";
+  button.disabled = true;
+  window.setTimeout(() => {
+    button.textContent = previous;
+    button.disabled = false;
+  }, 1200);
+}
+
+async function regenerateAssistantMessage(messageIndex) {
+  if (isSending) return;
+  if (!Number.isInteger(messageIndex) || !messages[messageIndex] || messages[messageIndex].role !== "assistant") return;
+  const userIndex = findPreviousUserMessageIndex(messageIndex);
+  if (userIndex < 0) return;
+  messages = messages.slice(0, messageIndex);
+  saveLocalMessages(messages);
+  renderMessages();
+  await sendMessage();
+}
+
+function findPreviousUserMessageIndex(fromIndex) {
+  for (let index = Math.min(fromIndex - 1, messages.length - 1); index >= 0; index -= 1) {
+    if (messages[index]?.role === "user") return index;
+  }
+  return -1;
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.append(area);
+  area.select();
+  document.execCommand("copy");
+  area.remove();
+}
+
+function imageDownloadName(url, index) {
+  const cleanUrl = String(url || "").split("?", 1)[0];
+  const extension = cleanUrl.match(/\.(png|jpe?g|webp|gif)$/i)?.[0] || ".png";
+  return `minai-image-${index + 1}${extension.toLowerCase()}`;
+}
+
+function isAbortError(error) {
+  return error?.name === "AbortError";
 }
 
 function activeModelText() {
@@ -852,6 +1011,7 @@ function applyConversationPayload(data) {
 
 async function saveMessages(immediate = false) {
   const safeMessages = sanitizeMessages(messages);
+  const persistMessages = safeMessages.filter((message) => !message.error);
   const snapshot = JSON.stringify(safeMessages);
   saveLocalMessages(safeMessages);
   if (!config.user || isHydratingConversation) return;
@@ -863,7 +1023,7 @@ async function saveMessages(immediate = false) {
     const response = await fetch("/api/conversations/current", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId: currentConversationId, messages: safeMessages })
+      body: JSON.stringify({ conversationId: currentConversationId, messages: persistMessages })
     }).catch(() => null);
     if (response?.ok) {
       const data = await response.json().catch(() => ({}));
@@ -891,6 +1051,7 @@ function sanitizeMessages(source) {
     .map((message) => ({
       role: message.role,
       content: String(message.content || ""),
+      error: Boolean(message.error),
       images: Array.isArray(message.images)
         ? message.images
             .filter(
@@ -1010,6 +1171,20 @@ function scrollToBottom() {
   });
 }
 
-function wait(ms) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
+function wait(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const timer = window.setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        window.clearTimeout(timer);
+        reject(new DOMException("Aborted", "AbortError"));
+      },
+      { once: true }
+    );
+  });
 }

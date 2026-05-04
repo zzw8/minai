@@ -964,6 +964,49 @@ a {
   color: var(--danger);
 }
 
+.message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.message-actions button,
+.image-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: var(--control-bg);
+  color: var(--text-soft);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 650;
+  text-decoration: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.message-actions button:hover,
+.image-download:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: var(--control-hover);
+  color: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+.message-actions button:disabled {
+  cursor: default;
+  opacity: 0.72;
+  transform: none;
+}
+
 .image-gallery {
   display: grid;
   gap: 10px;
@@ -971,9 +1014,16 @@ a {
 }
 
 .image-item {
-  display: block;
+  position: relative;
+  display: grid;
   width: min(520px, 100%);
   color: var(--danger);
+  text-decoration: none;
+}
+
+.image-item > a:first-child {
+  display: block;
+  color: inherit;
   text-decoration: none;
 }
 
@@ -983,6 +1033,23 @@ a {
   border: 1px solid var(--line);
   border-radius: 16px;
   box-shadow: 0 14px 36px var(--shadow-soft);
+}
+
+.image-download {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  min-height: 32px;
+  border-color: rgba(255, 255, 255, 0.36);
+  background: rgba(10, 20, 34, 0.72);
+  color: #ffffff;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.image-download:hover {
+  background: rgba(10, 20, 34, 0.88);
+  color: #ffffff;
 }
 
 .image-load-error {
@@ -1195,6 +1262,18 @@ a {
   content: "↑";
   font-size: 20px;
   line-height: 1;
+}
+
+.composer.is-sending #sendButton {
+  background: var(--danger);
+  box-shadow:
+    0 12px 26px color-mix(in srgb, var(--danger) 20%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.composer.is-sending #sendButton span::before {
+  content: "■";
+  font-size: 13px;
 }
 
 .composer button:disabled {

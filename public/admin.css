@@ -482,7 +482,7 @@ textarea:focus {
 
 .create-user-form {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 150px auto;
+  grid-template-columns: repeat(3, minmax(120px, 1fr)) 130px 130px 130px auto;
   gap: 10px;
   margin-bottom: 8px;
 }
@@ -495,7 +495,7 @@ textarea:focus {
 
 .user-row {
   display: grid;
-  grid-template-columns: minmax(160px, 1.1fr) repeat(4, minmax(120px, 1fr)) auto;
+  grid-template-columns: minmax(160px, 1.1fr) repeat(6, minmax(110px, 1fr)) auto;
   gap: 10px;
   align-items: center;
   border: 1px solid var(--line);
@@ -520,6 +520,23 @@ textarea:focus {
   color: var(--muted);
   font-size: 12px;
   margin-top: 4px;
+}
+
+.reset-usage {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quota-meta {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .row-actions {

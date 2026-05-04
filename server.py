@@ -33,6 +33,8 @@ MAX_BODY_SIZE = 16 * 1024 * 1024
 GENERATED_IMAGE_MAX_BYTES = 25 * 1024 * 1024
 IMAGE_GENERATION_TIMEOUT = 30 * 60
 IMAGE_JOB_TTL = 6 * 60 * 60
+DEFAULT_DAILY_TEXT_LIMIT = 100
+DEFAULT_DAILY_IMAGE_LIMIT = 10
 DEFAULT_SYSTEM_PROMPT = "你是一个专业、简洁、友好的 AI 助手。请优先用中文回答，除非用户要求其他语言。"
 MODEL_CACHE = {}
 IMAGE_JOBS = {}
@@ -837,13 +839,106 @@ def save_users(users):
     write_json(USERS_PATH, users)
 
 
+def today_key():
+    return time.strftime("%Y-%m-%d", time.localtime())
+
+
+def parse_limit(value, default):
+    try:
+        return max(-1, int(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_count(value):
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def normalize_user_quota(user):
+    quota = user.get("quota") if isinstance(user.get("quota"), dict) else {}
+    return {
+        "dailyText": parse_limit(quota.get("dailyText"), DEFAULT_DAILY_TEXT_LIMIT),
+        "dailyImage": parse_limit(quota.get("dailyImage"), DEFAULT_DAILY_IMAGE_LIMIT),
+    }
+
+
+def normalize_user_usage(user):
+    usage = user.get("usage") if isinstance(user.get("usage"), dict) else {}
+    if usage.get("date") != today_key():
+        return {"date": today_key(), "text": 0, "image": 0}
+    return {
+        "date": usage.get("date"),
+        "text": parse_count(usage.get("text")),
+        "image": parse_count(usage.get("image")),
+    }
+
+
+def quota_remaining(limit, used):
+    if limit < 0:
+        return -1
+    return max(0, limit - used)
+
+
+def user_quota_snapshot(user):
+    quota = normalize_user_quota(user)
+    usage = normalize_user_usage(user)
+    return {
+        "quota": quota,
+        "usage": usage,
+        "remaining": {
+            "text": quota_remaining(quota["dailyText"], usage["text"]),
+            "image": quota_remaining(quota["dailyImage"], usage["image"]),
+        },
+    }
+
+
+def check_user_quota(user, kind):
+    if not user:
+        return None
+    snapshot = user_quota_snapshot(user)
+    key = "image" if kind == "image" else "text"
+    limit_key = "dailyImage" if key == "image" else "dailyText"
+    limit = snapshot["quota"][limit_key]
+    used = snapshot["usage"][key]
+    if limit >= 0 and used >= limit:
+        label = "图片生成" if key == "image" else "文本对话"
+        return f"今日{label}额度已用完，请联系管理员调整额度。"
+    return None
+
+
+def increment_user_usage(user_id, kind):
+    if not user_id:
+        return
+    users = list_users()
+    changed = False
+    for user in users:
+        if user.get("id") != user_id:
+            continue
+        usage = normalize_user_usage(user)
+        key = "image" if kind == "image" else "text"
+        usage[key] = int(usage.get(key) or 0) + 1
+        user["usage"] = usage
+        user["updatedAt"] = now_iso()
+        changed = True
+        break
+    if changed:
+        save_users(users)
+
+
 def public_user(user):
+    snapshot = user_quota_snapshot(user)
     return {
         "id": user.get("id"),
         "username": user.get("username"),
         "displayName": user.get("displayName") or user.get("username"),
         "role": user.get("role"),
         "status": user.get("status"),
+        "quota": snapshot["quota"],
+        "usage": snapshot["usage"],
+        "remaining": snapshot["remaining"],
         "createdAt": user.get("createdAt"),
         "updatedAt": user.get("updatedAt"),
     }
@@ -1397,12 +1492,20 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(403, {"error": "该模型未在后台开放，请选择其他模型或联系管理员。"})
             return
 
-        if is_image_model(selected_model):
+        request_kind = "image" if is_image_model(selected_model) else "text"
+        quota_error = check_user_quota(user, request_kind)
+        if quota_error:
+            self.send_json(429, {"error": quota_error, "quota": user_quota_snapshot(user) if user else None})
+            return
+
+        if request_kind == "image":
             prompt = latest_user_prompt(messages)
             if not prompt:
                 self.send_json(400, {"error": "请输入图片描述。"})
                 return
 
+            if user:
+                increment_user_usage(user["id"], "image")
             job = create_image_generation_job(
                 provider,
                 selected_model,
@@ -1422,6 +1525,8 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        if user:
+            increment_user_usage(user["id"], "text")
         payload = {
             "model": selected_model,
             "temperature": body.get("temperature") if isinstance(body.get("temperature"), (int, float)) else 0.7,
@@ -1775,6 +1880,11 @@ class Handler(BaseHTTPRequestHandler):
             "displayName": display_name,
             "role": role,
             "status": status,
+            "quota": {
+                "dailyText": parse_limit(body.get("dailyText"), DEFAULT_DAILY_TEXT_LIMIT),
+                "dailyImage": parse_limit(body.get("dailyImage"), DEFAULT_DAILY_IMAGE_LIMIT),
+            },
+            "usage": {"date": today_key(), "text": 0, "image": 0},
             "passwordHash": hash_password(password),
             "createdAt": now_iso(),
             "updatedAt": now_iso(),
@@ -1809,6 +1919,13 @@ class Handler(BaseHTTPRequestHandler):
         current["displayName"] = clean_text(body.get("displayName") or current.get("displayName") or current["username"], 40)
         current["role"] = next_role
         current["status"] = next_status
+        current["quota"] = {
+            "dailyText": parse_limit(body.get("dailyText"), normalize_user_quota(current)["dailyText"]),
+            "dailyImage": parse_limit(body.get("dailyImage"), normalize_user_quota(current)["dailyImage"]),
+        }
+        current["usage"] = normalize_user_usage(current)
+        if body.get("resetUsage"):
+            current["usage"] = {"date": today_key(), "text": 0, "image": 0}
         current["updatedAt"] = now_iso()
         if isinstance(body.get("password"), str) and body.get("password").strip():
             password_error = validate_password(body.get("password"))
