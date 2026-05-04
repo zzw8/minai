@@ -389,6 +389,97 @@ textarea:focus {
   color: var(--danger);
 }
 
+.model-access {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+  padding: 12px;
+}
+
+.model-access-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.model-access-top strong,
+.model-access-top small {
+  display: block;
+}
+
+.model-access-top small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.model-access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.model-access-actions .ghost-button {
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.model-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.model-check {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 9px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.model-check input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--primary);
+}
+
+.model-check span {
+  min-width: 0;
+}
+
+.model-check strong,
+.model-check small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-check small,
+.model-empty {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.model-empty {
+  margin: 0;
+}
+
 .create-user-form {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr 150px auto;
@@ -473,6 +564,15 @@ textarea:focus {
 
   .provider-top {
     flex-direction: column;
+  }
+
+  .model-access-top {
+    flex-direction: column;
+  }
+
+  .model-checks {
+    grid-template-columns: 1fr;
+    max-height: 340px;
   }
 
   .provider-top small {

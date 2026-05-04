@@ -235,6 +235,7 @@ function renderProviders(providers) {
     card.elements.aiModel.value = provider.aiModel || "";
     card.elements.enabled.checked = Boolean(provider.enabled);
     card.elements.isDefault.checked = Boolean(provider.isDefault);
+    renderModelAccess(card, provider.availableModels || [], provider.allowedModels || []);
     card.querySelector('[data-field="metrics"]').innerHTML = `
       <span>调用 ${provider.calls}</span>
       <span>成功 ${provider.success}</span>
@@ -247,6 +248,7 @@ function renderProviders(providers) {
     card.addEventListener("submit", async (event) => {
       event.preventDefault();
       const payload = providerPayload(new FormData(card));
+      if (!validateModelSelection(card, payload)) return;
       const result = await api(`/api/admin/providers/${encodeURIComponent(provider.id)}`, {
         method: "PUT",
         body: JSON.stringify(payload)
@@ -279,6 +281,20 @@ function renderProviders(providers) {
 
     card.querySelector(".fetch-provider-models").addEventListener("click", async (event) => {
       await fetchModelsForForm(card, provider.id, event.currentTarget);
+    });
+
+    card.querySelector(".select-all-models").addEventListener("click", () => {
+      card.querySelectorAll('input[name="allowedModels"]').forEach((input) => {
+        input.checked = true;
+      });
+      updateModelAccessSummary(card);
+    });
+
+    card.querySelector(".clear-all-models").addEventListener("click", () => {
+      card.querySelectorAll('input[name="allowedModels"]').forEach((input) => {
+        input.checked = false;
+      });
+      updateModelAccessSummary(card);
     });
 
     card.querySelector(".delete-provider").addEventListener("click", async () => {
@@ -321,7 +337,7 @@ async function fetchModelsForForm(form, providerId, button) {
     return;
   }
 
-  const models = result.data.models || [];
+  const models = result.data.allModels || result.data.models || [];
   updateModelOptions(models);
   if (!models.length) {
     showMessage(providersMessage, "已连接到接口，但上游没有返回可用模型。", true);
@@ -336,7 +352,71 @@ async function fetchModelsForForm(form, providerId, button) {
       ? result.data.defaultModelId
       : models[0].id;
   form.elements.aiModel.value = nextModel;
-  showMessage(providersMessage, `已获取 ${models.length} 个模型，当前填入 ${nextModel}。`);
+  renderModelAccess(form, models, result.data.allowedModels || []);
+  showMessage(providersMessage, `已获取 ${models.length} 个模型。勾选前台允许使用的模型后点击保存。`);
+}
+
+function renderModelAccess(form, models, allowedModels) {
+  const container = form.querySelector('[data-field="modelAccess"]');
+  const checks = form.querySelector('[data-field="modelChecks"]');
+  if (!container || !checks) return;
+
+  const cleanModels = dedupeModels(models);
+  const allowedSet = new Set(allowedModels?.length ? allowedModels : cleanModels.map((model) => model.id));
+  checks.innerHTML = "";
+  container.classList.toggle("is-empty", cleanModels.length === 0);
+
+  if (!cleanModels.length) {
+    checks.innerHTML = '<p class="model-empty">还没有读取模型。点击“获取模型”后可勾选前台开放范围。</p>';
+    updateModelAccessSummary(form);
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  cleanModels.forEach((model) => {
+    const item = document.createElement("label");
+    item.className = "model-check";
+    item.innerHTML = `
+      <input name="allowedModels" type="checkbox" value="${escapeHtml(model.id)}" ${allowedSet.has(model.id) ? "checked" : ""} />
+      <span>
+        <strong>${escapeHtml(model.name || model.id)}</strong>
+        <small>${escapeHtml([model.id, model.type, model.tags].filter(Boolean).join(" · "))}</small>
+      </span>
+    `;
+    item.querySelector("input").addEventListener("change", () => updateModelAccessSummary(form));
+    fragment.append(item);
+  });
+  checks.append(fragment);
+  updateModelAccessSummary(form);
+}
+
+function updateModelAccessSummary(form) {
+  const summary = form.querySelector('[data-field="modelAccessSummary"]');
+  if (!summary) return;
+  const total = form.querySelectorAll('input[name="allowedModels"]').length;
+  const selected = form.querySelectorAll('input[name="allowedModels"]:checked').length;
+  summary.textContent = total ? `已开放 ${selected} / ${total} 个模型` : "点击获取模型后可勾选开放范围";
+}
+
+function validateModelSelection(form, payload) {
+  const total = form.querySelectorAll('input[name="allowedModels"]').length;
+  if (total > 0 && !payload.allowedModels.length) {
+    showMessage(providersMessage, "至少勾选一个前台可用模型。若要开放全部，请点击全选。", true);
+    return false;
+  }
+  return true;
+}
+
+function dedupeModels(models) {
+  const seen = new Set();
+  const result = [];
+  (Array.isArray(models) ? models : []).forEach((model) => {
+    const id = String(model?.id || "").trim();
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    result.push({ ...model, id });
+  });
+  return result;
 }
 
 function updateModelOptions(models) {
@@ -412,6 +492,7 @@ function providerPayload(data) {
     apiPath: data.get("apiPath"),
     apiKey: data.get("apiKey"),
     aiModel: data.get("aiModel"),
+    allowedModels: data.getAll("allowedModels"),
     enabled: data.get("enabled") === "on",
     isDefault: data.get("isDefault") === "on"
   };

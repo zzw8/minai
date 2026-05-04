@@ -221,6 +221,19 @@
           </label>
         </div>
         <div class="metrics" data-field="metrics"></div>
+        <div class="model-access" data-field="modelAccess">
+          <div class="model-access-top">
+            <div>
+              <strong>前台可用模型</strong>
+              <small data-field="modelAccessSummary">点击获取模型后可勾选开放范围</small>
+            </div>
+            <div class="model-access-actions">
+              <button type="button" class="ghost-button select-all-models">全选</button>
+              <button type="button" class="ghost-button clear-all-models">清空</button>
+            </div>
+          </div>
+          <div class="model-checks" data-field="modelChecks"></div>
+        </div>
         <div class="provider-actions">
           <button type="submit">保存</button>
           <button type="button" class="ghost-button fetch-provider-models">获取模型</button>
@@ -230,6 +243,6 @@
       </form>
     </template>
 
-    <script src="/admin.js?v=20260504-model-fetch" type="module"></script>
+    <script src="/admin.js?v=20260504-model-access" type="module"></script>
   </body>
 </html>

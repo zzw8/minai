@@ -121,6 +121,20 @@ def normalize_model_id(model_id):
     return MODEL_ALIASES.get(cleaned.lower(), cleaned)
 
 
+def normalized_model_ids(values):
+    if not isinstance(values, list):
+        return []
+    seen = set()
+    result = []
+    for value in values:
+        model_id = normalize_model_id(value.get("id") if isinstance(value, dict) else value)
+        if not model_id or model_id in seen:
+            continue
+        seen.add(model_id)
+        result.append(model_id)
+    return result
+
+
 def display_model_name(model_id):
     return normalize_model_id(model_id)
 
@@ -197,6 +211,8 @@ def new_provider(data):
         "apiPath": clean_text(data.get("apiPath") or "", 120),
         "apiKey": str(data.get("apiKey") or "").strip(),
         "aiModel": clean_text(data.get("aiModel") or "gpt-4o-mini", 80) or "gpt-4o-mini",
+        "availableModels": data.get("availableModels") if isinstance(data.get("availableModels"), list) else [],
+        "allowedModels": normalized_model_ids(data.get("allowedModels") or []),
         "enabled": bool(data.get("enabled", True)),
         "isDefault": bool(data.get("isDefault")),
         "calls": 0,
@@ -251,6 +267,16 @@ def list_providers():
         if "apiPath" not in provider:
             provider["apiPath"] = infer_api_path(provider.get("apiHost") or provider.get("apiBaseUrl"))
             changed = True
+        if "availableModels" not in provider or not isinstance(provider.get("availableModels"), list):
+            provider["availableModels"] = []
+            changed = True
+        if "allowedModels" not in provider or not isinstance(provider.get("allowedModels"), list):
+            provider["allowedModels"] = []
+            changed = True
+        normalized_allowed = normalized_model_ids(provider.get("allowedModels"))
+        if normalized_allowed != provider.get("allowedModels"):
+            provider["allowedModels"] = normalized_allowed
+            changed = True
         provider["apiBaseUrl"] = provider.get("apiHost")
         for key, fallback in {
             "calls": 0,
@@ -291,6 +317,8 @@ def public_provider(provider):
         "apiBaseUrl": provider.get("apiHost") or provider.get("apiBaseUrl"),
         "endpointUrl": chat_completions_url(provider),
         "aiModel": normalize_model_id(provider.get("aiModel")),
+        "availableModels": public_models_from_upstream(provider.get("availableModels") or []),
+        "allowedModels": normalized_model_ids(provider.get("allowedModels") or []),
         "enabled": bool(provider.get("enabled")),
         "isDefault": bool(provider.get("isDefault")),
         "apiKeySet": bool(provider.get("apiKey")),
@@ -388,7 +416,43 @@ def public_models_from_upstream(upstream):
     return list(deduped_models.values())
 
 
-def fetch_provider_model_payload(provider):
+def filter_provider_models(provider, models):
+    allowed = set(normalized_model_ids(provider.get("allowedModels") or []))
+    if not allowed:
+        return models
+    return [model for model in models if model.get("id") in allowed]
+
+
+def effective_provider_model(provider):
+    default_model = normalize_model_id(provider.get("aiModel") or "gpt-4o-mini")
+    allowed = normalized_model_ids(provider.get("allowedModels") or [])
+    if allowed and default_model not in allowed:
+        return allowed[0]
+    return default_model
+
+
+def is_provider_model_allowed(provider, model_id):
+    allowed = set(normalized_model_ids(provider.get("allowedModels") or []))
+    return not allowed or normalize_model_id(model_id) in allowed
+
+
+def save_provider_models(provider_id, models, allowed_models=None):
+    providers = list_providers()
+    for provider in providers:
+        if provider.get("id") != provider_id:
+            continue
+        provider["availableModels"] = models
+        if allowed_models is None and not provider.get("allowedModels"):
+            provider["allowedModels"] = [model["id"] for model in models if model.get("id")]
+        elif allowed_models is not None:
+            provider["allowedModels"] = normalized_model_ids(allowed_models)
+        provider["updatedAt"] = now_iso()
+        save_providers(providers)
+        return provider
+    return None
+
+
+def fetch_provider_model_payload(provider, apply_access_filter=False):
     if not provider.get("apiKey"):
         raise ModelFetchError(400, "请先填写 API Key 后再获取模型。")
 
@@ -419,11 +483,18 @@ def fetch_provider_model_payload(provider):
         raise ModelFetchError(502, "无法获取模型列表，请检查 API Host、API Path、API Key 或服务器网络。")
 
     models = public_models_from_upstream(upstream)
+    visible_models = filter_provider_models(provider, models) if apply_access_filter else models
+    default_model_id = effective_provider_model(provider)
+    visible_ids = {model.get("id") for model in visible_models}
+    if apply_access_filter and visible_models and default_model_id not in visible_ids:
+        default_model_id = visible_models[0]["id"]
     return {
         "provider": public_provider(provider),
-        "defaultModel": display_model_name(provider.get("aiModel")),
-        "defaultModelId": normalize_model_id(provider.get("aiModel")),
-        "models": models,
+        "defaultModel": display_model_name(default_model_id),
+        "defaultModelId": default_model_id,
+        "models": visible_models,
+        "allModels": models,
+        "allowedModels": normalized_model_ids(provider.get("allowedModels") or []),
         "count": len(models),
     }
 
@@ -1321,7 +1392,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(400, {"error": "请输入消息内容。"})
             return
 
-        selected_model = normalize_model_id(body.get("model") or provider["aiModel"])
+        selected_model = normalize_model_id(body.get("model") or effective_provider_model(provider))
+        if not is_provider_model_allowed(provider, selected_model):
+            self.send_json(403, {"error": "该模型未在后台开放，请选择其他模型或联系管理员。"})
+            return
 
         if is_image_model(selected_model):
             prompt = latest_user_prompt(messages)
@@ -1426,7 +1500,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
-            payload = fetch_provider_model_payload(provider)
+            payload = fetch_provider_model_payload(provider, apply_access_filter=True)
         except ModelFetchError as error:
             self.send_json(error.status, {"error": error.message})
             return
@@ -1633,6 +1707,13 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(error.status, {"error": error.message})
             return
 
+        if provider_id:
+            saved_provider = save_provider_models(provider_id, payload["allModels"])
+            if saved_provider:
+                payload["provider"] = public_provider(saved_provider)
+                payload["allowedModels"] = normalized_model_ids(saved_provider.get("allowedModels") or [])
+                MODEL_CACHE.clear()
+
         self.send_json(200, payload)
 
     def provider_from_body(self, body, current=None):
@@ -1645,6 +1726,11 @@ class Handler(BaseHTTPRequestHandler):
         provider["apiPath"] = clean_text(body.get("apiPath") if body.get("apiPath") is not None else provider.get("apiPath"), 120)
         provider["apiBaseUrl"] = provider["apiHost"]
         provider["aiModel"] = normalize_model_id(body.get("aiModel") or provider.get("aiModel") or "gpt-4o-mini")
+        provider["availableModels"] = public_models_from_upstream(provider.get("availableModels") or [])
+        if isinstance(body.get("allowedModels"), list):
+            provider["allowedModels"] = normalized_model_ids(body.get("allowedModels"))
+        else:
+            provider["allowedModels"] = normalized_model_ids(provider.get("allowedModels") or [])
         provider["enabled"] = bool(body.get("enabled", provider.get("enabled", True)))
         provider["isDefault"] = bool(body.get("isDefault", provider.get("isDefault", False)))
         provider["updatedAt"] = now_iso()
