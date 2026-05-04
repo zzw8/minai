@@ -1,9 +1,11 @@
 const form = document.querySelector("#chatForm");
+const appShell = document.querySelector("#appShell");
 const input = document.querySelector("#messageInput");
 const sendButton = document.querySelector("#sendButton");
 const messagesEl = document.querySelector("#messages");
 const template = document.querySelector("#messageTemplate");
 const newChatButton = document.querySelector("#newChatButton");
+const sidebarToggle = document.querySelector("#sidebarToggle");
 const authButton = document.querySelector("#authButton");
 const accountMenu = document.querySelector("#accountMenu");
 const authModal = document.querySelector("#authModal");
@@ -27,6 +29,7 @@ const attachmentTray = document.querySelector("#attachmentTray");
 const STORAGE_KEY = "minimal-ai-site/messages";
 const MODEL_STORAGE_KEY = "minimal-ai-site/model";
 const THEME_STORAGE_KEY = "minimal-ai-site/theme";
+const SIDEBAR_STORAGE_KEY = "minimal-ai-site/sidebar-collapsed";
 const MODEL_ALIASES = {
   "gpt-image-2": "gpt-image-2-all"
 };
@@ -40,6 +43,7 @@ let selectedModel = normalizeModelId(localStorage.getItem(MODEL_STORAGE_KEY) || 
 let conversationSwitchToken = 0;
 let pendingFiles = [];
 let currentTheme = localStorage.getItem(THEME_STORAGE_KEY) || preferredTheme();
+let sidebarCollapsed = localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true";
 let lastSavedMessagesSignature = messageSignature(messages);
 let config = {
   siteTitle: "MinAI",
@@ -48,6 +52,7 @@ let config = {
 };
 
 applyTheme(currentTheme);
+applySidebarState();
 await bootstrap();
 renderMessages();
 renderConversationList();
@@ -101,6 +106,12 @@ newChatButton?.addEventListener("click", async () => {
   await wait(240);
   messagesEl.classList.remove("is-resetting");
   newChatButton.classList.remove("is-sparking");
+});
+
+sidebarToggle?.addEventListener("click", () => {
+  sidebarCollapsed = !sidebarCollapsed;
+  localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
+  applySidebarState();
 });
 
 conversationList.addEventListener("click", async (event) => {
@@ -193,14 +204,6 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") hideAccountMenu();
-});
-
-window.addEventListener("resize", () => {
-  if (!accountPopover.classList.contains("hidden")) positionAccountPopover();
-});
-
-window.visualViewport?.addEventListener("resize", () => {
-  if (!accountPopover.classList.contains("hidden")) positionAccountPopover();
 });
 
 closeAuthButton.addEventListener("click", () => {
@@ -572,6 +575,13 @@ function applyTheme(theme) {
   });
 }
 
+function applySidebarState() {
+  appShell.classList.toggle("sidebar-collapsed", sidebarCollapsed);
+  sidebarToggle.setAttribute("aria-expanded", String(!sidebarCollapsed));
+  sidebarToggle.title = sidebarCollapsed ? "展开对话栏" : "收起对话栏";
+  sidebarToggle.setAttribute("aria-label", sidebarToggle.title);
+}
+
 function updateAuthUI() {
   if (config.user) {
     const displayName = config.user.displayName || config.user.username;
@@ -596,32 +606,12 @@ function toggleAccountMenu() {
   accountPopover.classList.toggle("hidden", !nextOpen);
   accountMenu.classList.toggle("is-open", nextOpen);
   authButton.setAttribute("aria-expanded", String(nextOpen));
-  if (nextOpen) {
-    positionAccountPopover();
-    requestAnimationFrame(positionAccountPopover);
-  }
 }
 
 function hideAccountMenu() {
   accountPopover.classList.add("hidden");
   accountMenu.classList.remove("is-open");
-  accountPopover.removeAttribute("style");
   authButton.setAttribute("aria-expanded", "false");
-}
-
-function positionAccountPopover() {
-  const rect = authButton.getBoundingClientRect();
-  const gap = 10;
-  const margin = 12;
-  const width = Math.min(268, window.innerWidth - margin * 2);
-  const left = Math.min(Math.max(margin, rect.right - width), window.innerWidth - width - margin);
-  accountPopover.style.setProperty("--account-popover-width", `${width}px`);
-
-  const height = accountPopover.offsetHeight || 190;
-  const top = Math.max(margin, Math.min(rect.bottom + gap, window.innerHeight - height - margin));
-
-  accountPopover.style.setProperty("--account-popover-left", `${left}px`);
-  accountPopover.style.setProperty("--account-popover-top", `${top}px`);
 }
 
 function updateInputState() {

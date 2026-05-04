@@ -50,7 +50,8 @@
   --caret: #555555;
   --subtle-grid: rgba(17, 17, 17, 0.035);
   --radius: 10px;
-  --account-z: 300;
+  --account-z: 260;
+  --modal-z: 500;
 }
 
 :root[data-theme="dark"] {
@@ -167,6 +168,7 @@ a {
   height: 100vh;
   height: 100dvh;
   min-height: 620px;
+  transition: grid-template-columns 180ms ease;
 }
 
 .side-panel {
@@ -182,9 +184,13 @@ a {
   color: var(--text);
   padding: 14px 12px;
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.08);
+  transition:
+    padding 180ms ease,
+    width 180ms ease;
 }
 
 .brand {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -226,6 +232,91 @@ a {
   color: var(--accent-strong);
   font-size: 12px;
   font-weight: 650;
+}
+
+.sidebar-toggle {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  margin-left: auto;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--control-bg);
+  color: var(--text-soft);
+  box-shadow:
+    var(--control-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.sidebar-toggle span {
+  width: 9px;
+  height: 9px;
+  border-bottom: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  transform: translateX(2px) rotate(45deg);
+  transition: transform 160ms ease;
+}
+
+.sidebar-toggle:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: var(--control-hover);
+  color: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+.sidebar-toggle:focus-visible {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 3px var(--focus),
+    var(--control-shadow);
+  outline: 0;
+}
+
+.app-shell.sidebar-collapsed {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
+.app-shell.sidebar-collapsed .side-panel {
+  align-items: center;
+  padding-inline: 10px;
+}
+
+.app-shell.sidebar-collapsed .brand {
+  width: 100%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding-inline: 0;
+}
+
+.app-shell.sidebar-collapsed .brand-copy,
+.app-shell.sidebar-collapsed .conversation-section,
+.app-shell.sidebar-collapsed .sidebar-space,
+.app-shell.sidebar-collapsed .admin-link,
+.app-shell.sidebar-collapsed .new-chat span:last-child {
+  display: none;
+}
+
+.app-shell.sidebar-collapsed .sidebar-toggle {
+  margin-left: 0;
+}
+
+.app-shell.sidebar-collapsed .sidebar-toggle span {
+  transform: translateX(-2px) rotate(-135deg);
+}
+
+.app-shell.sidebar-collapsed .new-chat {
+  width: 44px;
+  min-width: 44px;
+  justify-content: center;
+  padding: 0;
 }
 
 .new-chat,
@@ -457,7 +548,7 @@ a {
 
 .chat-header {
   position: relative;
-  z-index: 80;
+  z-index: 120;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -493,7 +584,7 @@ a {
   gap: 8px;
   min-width: 0;
   position: relative;
-  z-index: 90;
+  z-index: 130;
 }
 
 .auth-button,
@@ -609,12 +700,11 @@ a {
 }
 
 .account-popover {
-  position: fixed;
-  left: var(--account-popover-left, 12px);
-  top: var(--account-popover-top, 66px);
-  right: auto;
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
   z-index: var(--account-z);
-  width: var(--account-popover-width, 268px);
+  width: min(268px, calc(100vw - 24px));
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--popover-bg);
@@ -1121,7 +1211,7 @@ a {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   padding: 20px;
-  z-index: 20;
+  z-index: var(--modal-z);
 }
 
 .hidden {
@@ -1381,12 +1471,6 @@ a {
 
   .model-select {
     width: min(220px, 42vw);
-  }
-
-  .account-popover {
-    left: var(--account-popover-left, 12px);
-    right: auto;
-    width: var(--account-popover-width, min(268px, calc(100vw - 24px)));
   }
 
   .message,

@@ -6,19 +6,22 @@
     <title>MinAI</title>
     <meta name="description" content="一个简约轻量的 AI 对话网站，适合部署在 1H1G 服务器。" />
     <link rel="icon" href="/assets/ai-avatar.png" />
-    <link rel="stylesheet" href="/styles.css?v=20260504-theme-polish" />
+    <link rel="stylesheet" href="/styles.css?v=20260504-sidebar-account" />
   </head>
   <body>
-    <main class="app-shell">
-      <aside class="side-panel" aria-label="会话">
+    <main class="app-shell" id="appShell">
+      <aside class="side-panel" id="sidePanel" aria-label="会话">
         <div class="brand">
           <div class="brand-mark" aria-hidden="true">
             <img src="/assets/ai-avatar.png" alt="" />
           </div>
-          <div>
+          <div class="brand-copy">
             <strong id="brandName">MinAI</strong>
             <small>Online</small>
           </div>
+          <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-controls="sidePanel" aria-expanded="true" title="收起对话栏">
+            <span aria-hidden="true"></span>
+          </button>
         </div>
 
         <button class="new-chat" id="newChatButton" type="button" title="新对话">
@@ -125,6 +128,6 @@
       </article>
     </template>
 
-    <script src="/app.js?v=20260504-theme-polish" type="module"></script>
+    <script src="/app.js?v=20260504-sidebar-account" type="module"></script>
   </body>
 </html>
