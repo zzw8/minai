@@ -2,8 +2,6 @@ name: Import MinAI release
 
 on:
   push:
-    paths:
-      - .github/workflows/import-release.yml
   workflow_dispatch:
 
 permissions:
@@ -41,4 +39,4 @@ jobs:
           git commit -m "Publish MinAI project"
           git push
 
-# trigger: 2026-05-04T02:54:00Z
+# trigger: all-push
