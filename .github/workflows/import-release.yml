@@ -19,7 +19,22 @@ jobs:
           curl -fsSL "https://ai.abits.top/minai-release-import.zip" -o /tmp/minai.zip
           rm -rf /tmp/minai
           mkdir -p /tmp/minai
-          unzip -q /tmp/minai.zip -d /tmp/minai
+          python3 - <<'PY'
+          import pathlib
+          import zipfile
+
+          dest = pathlib.Path('/tmp/minai')
+          with zipfile.ZipFile('/tmp/minai.zip') as archive:
+              for info in archive.infolist():
+                  name = info.filename.replace('\\', '/')
+                  if not name or name.endswith('/'):
+                      continue
+                  target = (dest / name).resolve()
+                  if dest.resolve() not in target.parents and target != dest.resolve():
+                      raise RuntimeError(f'Unsafe path: {info.filename}')
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(archive.read(info))
+          PY
 
       - name: Replace repository contents
         run: |
@@ -39,4 +54,4 @@ jobs:
           git commit -m "Publish MinAI project"
           git push
 
-# trigger: all-push
+# trigger: python-extract
