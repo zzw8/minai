@@ -5,6 +5,7 @@ const messagesEl = document.querySelector("#messages");
 const template = document.querySelector("#messageTemplate");
 const newChatButton = document.querySelector("#newChatButton");
 const authButton = document.querySelector("#authButton");
+const accountMenu = document.querySelector("#accountMenu");
 const authModal = document.querySelector("#authModal");
 const loginForm = document.querySelector("#loginForm");
 const closeAuthButton = document.querySelector("#closeAuthButton");
@@ -192,6 +193,14 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") hideAccountMenu();
+});
+
+window.addEventListener("resize", () => {
+  if (!accountPopover.classList.contains("hidden")) positionAccountPopover();
+});
+
+window.visualViewport?.addEventListener("resize", () => {
+  if (!accountPopover.classList.contains("hidden")) positionAccountPopover();
 });
 
 closeAuthButton.addEventListener("click", () => {
@@ -585,12 +594,34 @@ function updateAuthUI() {
 function toggleAccountMenu() {
   const nextOpen = accountPopover.classList.contains("hidden");
   accountPopover.classList.toggle("hidden", !nextOpen);
+  accountMenu.classList.toggle("is-open", nextOpen);
   authButton.setAttribute("aria-expanded", String(nextOpen));
+  if (nextOpen) {
+    positionAccountPopover();
+    requestAnimationFrame(positionAccountPopover);
+  }
 }
 
 function hideAccountMenu() {
   accountPopover.classList.add("hidden");
+  accountMenu.classList.remove("is-open");
+  accountPopover.removeAttribute("style");
   authButton.setAttribute("aria-expanded", "false");
+}
+
+function positionAccountPopover() {
+  const rect = authButton.getBoundingClientRect();
+  const gap = 10;
+  const margin = 12;
+  const width = Math.min(268, window.innerWidth - margin * 2);
+  const left = Math.min(Math.max(margin, rect.right - width), window.innerWidth - width - margin);
+  accountPopover.style.setProperty("--account-popover-width", `${width}px`);
+
+  const height = accountPopover.offsetHeight || 190;
+  const top = Math.max(margin, Math.min(rect.bottom + gap, window.innerHeight - height - margin));
+
+  accountPopover.style.setProperty("--account-popover-left", `${left}px`);
+  accountPopover.style.setProperty("--account-popover-top", `${top}px`);
 }
 
 function updateInputState() {

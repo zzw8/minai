@@ -1,60 +1,73 @@
 :root {
   color-scheme: light;
-  --page-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(246, 247, 249, 0.9)), #ffffff;
+  --page-bg:
+    linear-gradient(135deg, rgba(227, 247, 255, 0.72), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(243, 248, 250, 0.92) 54%, rgba(249, 247, 255, 0.86)),
+    #f8fbfd;
   --bg: #ffffff;
-  --surface: rgba(255, 255, 255, 0.78);
+  --surface: rgba(255, 255, 255, 0.76);
   --surface-strong: rgba(255, 255, 255, 0.94);
-  --sidebar: rgba(247, 247, 248, 0.88);
-  --sidebar-hover: rgba(0, 0, 0, 0.055);
-  --chat-bg: rgba(255, 255, 255, 0.7);
-  --header-bg: rgba(255, 255, 255, 0.74);
-  --popover-bg: rgba(255, 255, 255, 0.92);
-  --modal-bg: rgba(255, 255, 255, 0.92);
+  --sidebar: rgba(247, 251, 253, 0.84);
+  --sidebar-hover: rgba(13, 148, 190, 0.08);
+  --chat-bg: rgba(255, 255, 255, 0.62);
+  --header-bg: rgba(255, 255, 255, 0.7);
+  --popover-bg: rgba(255, 255, 255, 0.9);
+  --modal-bg: rgba(255, 255, 255, 0.9);
   --overlay: rgba(17, 24, 39, 0.28);
   --text: #111111;
   --text-soft: #343541;
   --muted: #6f6f6f;
-  --line: rgba(0, 0, 0, 0.1);
-  --line-soft: rgba(0, 0, 0, 0.06);
-  --bubble: #f4f4f4;
-  --assistant-bubble: rgba(255, 255, 255, 0.68);
-  --user-bubble: #111111;
+  --line: rgba(10, 37, 64, 0.12);
+  --line-soft: rgba(10, 37, 64, 0.075);
+  --bubble: #f4f7f9;
+  --assistant-bubble: rgba(255, 255, 255, 0.7);
+  --user-bubble: linear-gradient(135deg, #07182f, #0b6b82 66%, #0ea5e9);
   --user-bubble-text: #ffffff;
   --chip-bg: #ffffff;
-  --control-muted: #f4f4f4;
-  --accent: #10a37f;
-  --accent-strong: #0b8063;
-  --accent-soft: rgba(16, 163, 127, 0.12);
+  --control-muted: rgba(8, 36, 60, 0.06);
+  --control-bg: rgba(255, 255, 255, 0.82);
+  --control-hover: rgba(235, 250, 255, 0.96);
+  --accent: #0ea5e9;
+  --accent-strong: #0477c2;
+  --accent-secondary: #14b8a6;
+  --accent-soft: rgba(14, 165, 233, 0.12);
+  --accent-gradient: linear-gradient(135deg, #0ea5e9 0%, #14b8a6 48%, #5b7cfa 100%);
   --danger: #b42318;
   --danger-soft: rgba(180, 35, 24, 0.06);
-  --focus: rgba(16, 163, 127, 0.16);
+  --focus: rgba(14, 165, 233, 0.16);
   --primary: #111111;
   --primary-contrast: #ffffff;
   --avatar-bg: #111111;
   --avatar-text: #ffffff;
   --user-avatar-bg: #ececec;
   --user-avatar-text: #333333;
-  --shadow: rgba(0, 0, 0, 0.16);
-  --shadow-soft: rgba(0, 0, 0, 0.09);
-  --shine: rgba(255, 255, 255, 0.74);
+  --shadow: rgba(7, 24, 47, 0.18);
+  --shadow-soft: rgba(7, 24, 47, 0.1);
+  --control-shadow: 0 10px 24px rgba(7, 24, 47, 0.08);
+  --elevated-shadow: 0 22px 70px rgba(7, 24, 47, 0.18);
+  --shine: rgba(255, 255, 255, 0.78);
   --loading-line: rgba(17, 17, 17, 0.5);
   --caret: #555555;
   --subtle-grid: rgba(17, 17, 17, 0.035);
-  --radius: 8px;
+  --radius: 10px;
+  --account-z: 300;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page-bg: linear-gradient(180deg, rgba(19, 21, 25, 0.98), rgba(10, 11, 13, 0.94)), #0b0c0f;
-  --bg: #0b0c0f;
-  --surface: rgba(31, 33, 38, 0.76);
-  --surface-strong: rgba(36, 38, 44, 0.92);
-  --sidebar: rgba(18, 19, 23, 0.88);
-  --sidebar-hover: rgba(255, 255, 255, 0.08);
-  --chat-bg: rgba(12, 13, 16, 0.72);
-  --header-bg: rgba(17, 18, 22, 0.78);
-  --popover-bg: rgba(28, 30, 36, 0.94);
-  --modal-bg: rgba(28, 30, 36, 0.94);
+  --page-bg:
+    linear-gradient(135deg, rgba(14, 165, 233, 0.13), transparent 32%),
+    linear-gradient(180deg, rgba(5, 9, 24, 0.98), rgba(8, 15, 30, 0.96) 55%, rgba(5, 13, 20, 0.98)),
+    #070b16;
+  --bg: #070b16;
+  --surface: rgba(16, 24, 39, 0.72);
+  --surface-strong: rgba(20, 29, 45, 0.9);
+  --sidebar: rgba(8, 13, 26, 0.84);
+  --sidebar-hover: rgba(125, 211, 252, 0.1);
+  --chat-bg: rgba(6, 10, 21, 0.68);
+  --header-bg: rgba(8, 13, 26, 0.76);
+  --popover-bg: rgba(13, 21, 36, 0.94);
+  --modal-bg: rgba(13, 21, 36, 0.94);
   --overlay: rgba(0, 0, 0, 0.42);
   --text: #f4f4f5;
   --text-soft: #e6e7eb;
@@ -63,24 +76,30 @@
   --line-soft: rgba(255, 255, 255, 0.09);
   --bubble: rgba(255, 255, 255, 0.1);
   --assistant-bubble: rgba(255, 255, 255, 0.075);
-  --user-bubble: #f4f4f5;
+  --user-bubble: linear-gradient(135deg, #e0f7ff, #8bdeff 52%, #b8b7ff);
   --user-bubble-text: #111111;
   --chip-bg: rgba(255, 255, 255, 0.08);
   --control-muted: rgba(255, 255, 255, 0.08);
-  --accent: #6ee7b7;
-  --accent-strong: #34d399;
-  --accent-soft: rgba(110, 231, 183, 0.12);
+  --control-bg: rgba(18, 27, 43, 0.82);
+  --control-hover: rgba(27, 39, 61, 0.96);
+  --accent: #38bdf8;
+  --accent-strong: #67e8f9;
+  --accent-secondary: #5eead4;
+  --accent-soft: rgba(56, 189, 248, 0.14);
+  --accent-gradient: linear-gradient(135deg, #38bdf8 0%, #5eead4 48%, #818cf8 100%);
   --danger: #ff8a80;
   --danger-soft: rgba(255, 138, 128, 0.1);
-  --focus: rgba(110, 231, 183, 0.18);
+  --focus: rgba(56, 189, 248, 0.2);
   --primary: #f4f4f5;
   --primary-contrast: #111111;
   --avatar-bg: #f4f4f5;
   --avatar-text: #111111;
   --user-avatar-bg: rgba(255, 255, 255, 0.12);
   --user-avatar-text: #f4f4f5;
-  --shadow: rgba(0, 0, 0, 0.38);
-  --shadow-soft: rgba(0, 0, 0, 0.24);
+  --shadow: rgba(0, 0, 0, 0.42);
+  --shadow-soft: rgba(0, 0, 0, 0.26);
+  --control-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+  --elevated-shadow: 0 26px 80px rgba(0, 0, 0, 0.42);
   --shine: rgba(255, 255, 255, 0.2);
   --loading-line: rgba(255, 255, 255, 0.62);
   --caret: #c7cad1;
@@ -162,6 +181,7 @@ a {
   -webkit-backdrop-filter: blur(18px);
   color: var(--text);
   padding: 14px 12px;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 .brand {
@@ -219,7 +239,11 @@ a {
   text-align: left;
   text-decoration: none;
   transition:
+    border-color 160ms ease,
     background 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease,
+    filter 160ms ease,
     transform 160ms ease;
 }
 
@@ -229,11 +253,14 @@ a {
   align-items: center;
   gap: 10px;
   overflow: hidden;
-  border: 1px solid var(--line);
-  background: var(--surface);
+  border: 1px solid transparent;
+  background: var(--accent-gradient);
+  color: #ffffff;
   padding: 0 12px;
   font-weight: 650;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 14px 28px color-mix(in srgb, var(--accent) 24%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
 }
 
 .new-chat::after {
@@ -260,8 +287,20 @@ a {
 
 .new-chat:hover,
 .admin-link:hover {
-  background: var(--sidebar-hover);
   transform: translateY(-1px);
+}
+
+.new-chat:hover {
+  filter: saturate(1.08) brightness(1.03);
+  box-shadow:
+    0 18px 36px color-mix(in srgb, var(--accent) 28%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.36);
+}
+
+.admin-link:hover {
+  border-color: var(--line-soft);
+  background: var(--sidebar-hover);
+  color: var(--text);
 }
 
 .new-chat:active,
@@ -399,12 +438,16 @@ a {
   display: flex;
   align-items: center;
   padding: 0 12px;
-  border: 1px solid transparent;
+  border: 1px solid var(--line-soft);
+  background: rgba(255, 255, 255, 0.22);
   color: var(--muted);
   font-size: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .chat-panel {
+  position: relative;
+  isolation: isolate;
   display: grid;
   min-width: 0;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -413,6 +456,8 @@ a {
 }
 
 .chat-header {
+  position: relative;
+  z-index: 80;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -423,6 +468,7 @@ a {
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   padding: 12px 24px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.035);
 }
 
 .chat-header p {
@@ -446,6 +492,8 @@ a {
   align-items: center;
   gap: 8px;
   min-width: 0;
+  position: relative;
+  z-index: 90;
 }
 
 .auth-button,
@@ -455,10 +503,12 @@ a {
   min-height: 38px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--surface-strong);
+  background: var(--control-bg);
   color: var(--text);
   font-size: 13px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow:
+    var(--control-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
   transition:
     border-color 140ms ease,
     background 140ms ease,
@@ -471,7 +521,8 @@ a {
 .theme-toggle:hover,
 .ghost-button:hover {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
-  background: var(--surface);
+  background: var(--control-hover);
+  transform: translateY(-1px);
 }
 
 .theme-toggle {
@@ -480,6 +531,7 @@ a {
   min-width: 38px;
   place-items: center;
   padding: 0;
+  overflow: hidden;
 }
 
 .theme-toggle span {
@@ -499,6 +551,18 @@ a {
 .auth-button.is-user {
   padding-left: 13px;
   padding-right: 30px;
+}
+
+.auth-button.is-user::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--accent-secondary);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  vertical-align: 1px;
 }
 
 .auth-button.is-user::after {
@@ -533,20 +597,30 @@ a {
 
 .account-menu {
   position: relative;
+  z-index: calc(var(--account-z) + 1);
+}
+
+.account-menu.is-open .auth-button {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
+  background: var(--control-hover);
+  box-shadow:
+    0 0 0 3px var(--focus),
+    var(--control-shadow);
 }
 
 .account-popover {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  z-index: 30;
-  width: 240px;
+  position: fixed;
+  left: var(--account-popover-left, 12px);
+  top: var(--account-popover-top, 66px);
+  right: auto;
+  z-index: var(--account-z);
+  width: var(--account-popover-width, 268px);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 16px;
   background: var(--popover-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 22px 70px var(--shadow);
+  box-shadow: var(--elevated-shadow);
   padding: 8px;
   animation: popoverIn 130ms ease both;
 }
@@ -603,14 +677,22 @@ a {
   padding: 0 10px;
   text-align: left;
   text-decoration: none;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .account-popover a:hover,
 .account-popover button:hover {
   background: var(--sidebar-hover);
+  color: var(--text);
+  transform: translateX(2px);
 }
 
 .messages {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -736,7 +818,9 @@ a {
   border-radius: 20px 20px 6px 20px;
   background: var(--user-bubble);
   color: var(--user-bubble-text);
-  box-shadow: 0 10px 24px var(--shadow-soft);
+  box-shadow:
+    0 12px 28px var(--shadow-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
   padding: 11px 15px;
 }
 
@@ -855,6 +939,8 @@ a {
 }
 
 .composer {
+  position: relative;
+  z-index: 40;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
@@ -880,6 +966,10 @@ a {
 
 .composer:focus-within {
   transform: translateY(-1px);
+  box-shadow:
+    0 22px 60px var(--shadow-soft),
+    0 0 0 3px var(--focus),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .attachment-tray {
@@ -960,17 +1050,25 @@ a {
   place-items: center;
   border: 0;
   border-radius: 14px;
-  background: var(--primary);
-  color: var(--primary-contrast);
+  background: var(--accent-gradient);
+  color: #ffffff;
   font-weight: 700;
+  box-shadow:
+    0 12px 26px color-mix(in srgb, var(--accent) 24%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
   transition:
     background 140ms ease,
+    box-shadow 140ms ease,
+    filter 140ms ease,
     opacity 140ms ease,
     transform 140ms ease;
 }
 
 #sendButton:not(:disabled):hover {
-  background: var(--accent-strong);
+  filter: saturate(1.08) brightness(1.04);
+  box-shadow:
+    0 16px 34px color-mix(in srgb, var(--accent) 30%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
 }
 
 .attach-button,
@@ -978,11 +1076,13 @@ a {
   grid-area: attach;
   background: var(--control-muted);
   color: var(--text);
+  box-shadow: none;
 }
 
 .attach-button:not(:disabled):hover {
-  background: var(--accent-soft);
+  background: var(--control-hover);
   color: var(--accent-strong);
+  box-shadow: 0 8px 20px var(--shadow-soft);
 }
 
 .attach-button span {
@@ -1090,9 +1190,12 @@ a {
 
 .auth-actions button[type="submit"] {
   border: 0;
-  background: var(--primary);
-  color: var(--primary-contrast);
+  background: var(--accent-gradient);
+  color: #ffffff;
   font-weight: 700;
+  box-shadow:
+    0 12px 26px color-mix(in srgb, var(--accent) 22%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 .ghost-button {
@@ -1281,8 +1384,9 @@ a {
   }
 
   .account-popover {
-    right: 0;
-    width: min(240px, calc(100vw - 24px));
+    left: var(--account-popover-left, 12px);
+    right: auto;
+    width: var(--account-popover-width, min(268px, calc(100vw - 24px)));
   }
 
   .message,
