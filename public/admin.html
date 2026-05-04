@@ -122,7 +122,7 @@
             </label>
             <label>
               模型
-              <input name="aiModel" placeholder="deepseek-v3-1-250821" />
+              <input name="aiModel" list="adminModelOptions" placeholder="点击获取模型后选择" />
             </label>
             <label class="toggle-line">
               <input name="enabled" type="checkbox" checked />
@@ -134,10 +134,12 @@
             </label>
             <div class="provider-actions full">
               <button type="submit">添加通道</button>
+              <button id="fetchCreateModelsButton" type="button" class="ghost-button">获取模型</button>
               <button id="yunwuPresetButton" type="button" class="ghost-button">云雾预设</button>
               <p class="form-message" id="providersMessage"></p>
             </div>
           </form>
+          <datalist id="adminModelOptions"></datalist>
 
           <div class="providers-list" id="providersList"></div>
         </section>
@@ -208,7 +210,7 @@
           <input name="apiKey" type="password" placeholder="新 Key，留空不改" />
           <input name="apiHost" placeholder="API Host，例如 https://yunwu.ai" />
           <input name="apiPath" placeholder="API Path，例如 /v1/chat/completions" />
-          <input name="aiModel" placeholder="模型名称" />
+          <input name="aiModel" list="adminModelOptions" placeholder="点击获取模型后选择" />
           <label class="toggle-line compact">
             <input name="enabled" type="checkbox" />
             <span>启用</span>
@@ -221,12 +223,13 @@
         <div class="metrics" data-field="metrics"></div>
         <div class="provider-actions">
           <button type="submit">保存</button>
+          <button type="button" class="ghost-button fetch-provider-models">获取模型</button>
           <button type="button" class="ghost-button clear-provider-key">清空 Key</button>
           <button type="button" class="ghost-button delete-provider">删除</button>
         </div>
       </form>
     </template>
 
-    <script src="/admin.js?v=20260503-chatbox2" type="module"></script>
+    <script src="/admin.js?v=20260504-model-fetch" type="module"></script>
   </body>
 </html>

@@ -24,6 +24,8 @@ const activeProviderBadge = document.querySelector("#activeProviderBadge");
 const providerCount = document.querySelector("#providerCount");
 const userCount = document.querySelector("#userCount");
 const yunwuPresetButton = document.querySelector("#yunwuPresetButton");
+const fetchCreateModelsButton = document.querySelector("#fetchCreateModelsButton");
+const adminModelOptions = document.querySelector("#adminModelOptions");
 
 let currentAdmin = null;
 
@@ -118,10 +120,14 @@ yunwuPresetButton.addEventListener("click", () => {
   createProviderForm.elements.apiMode.value = "openai-compatible";
   createProviderForm.elements.apiHost.value = "https://yunwu.ai";
   createProviderForm.elements.apiPath.value = "/v1/chat/completions";
-  createProviderForm.elements.aiModel.value = "deepseek-v3-1-250821";
+  createProviderForm.elements.aiModel.value = "";
   createProviderForm.elements.enabled.checked = true;
   createProviderForm.elements.isDefault.checked = true;
   createProviderForm.elements.apiKey.focus();
+});
+
+fetchCreateModelsButton.addEventListener("click", async () => {
+  await fetchModelsForForm(createProviderForm, null, fetchCreateModelsButton);
 });
 
 createUserForm.addEventListener("submit", async (event) => {
@@ -271,6 +277,10 @@ function renderProviders(providers) {
       await loadProviders();
     });
 
+    card.querySelector(".fetch-provider-models").addEventListener("click", async (event) => {
+      await fetchModelsForForm(card, provider.id, event.currentTarget);
+    });
+
     card.querySelector(".delete-provider").addEventListener("click", async () => {
       if (!confirm(`删除 API 通道 ${provider.name}？`)) return;
       const result = await api(`/api/admin/providers/${encodeURIComponent(provider.id)}`, {
@@ -287,6 +297,59 @@ function renderProviders(providers) {
     });
 
     providersList.append(card);
+  });
+}
+
+async function fetchModelsForForm(form, providerId, button) {
+  const payload = providerPayload(new FormData(form));
+  if (providerId) payload.providerId = providerId;
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "获取中...";
+  showMessage(providersMessage, "正在从上游接口获取模型列表...");
+
+  const result = await api("/api/admin/models/preview", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+
+  button.disabled = false;
+  button.textContent = originalText;
+
+  if (!result.ok) {
+    showMessage(providersMessage, result.error, true);
+    return;
+  }
+
+  const models = result.data.models || [];
+  updateModelOptions(models);
+  if (!models.length) {
+    showMessage(providersMessage, "已连接到接口，但上游没有返回可用模型。", true);
+    return;
+  }
+
+  const currentModel = String(form.elements.aiModel.value || "").trim();
+  const modelIds = new Set(models.map((model) => model.id));
+  const nextModel = modelIds.has(currentModel)
+    ? currentModel
+    : modelIds.has(result.data.defaultModelId)
+      ? result.data.defaultModelId
+      : models[0].id;
+  form.elements.aiModel.value = nextModel;
+  showMessage(providersMessage, `已获取 ${models.length} 个模型，当前填入 ${nextModel}。`);
+}
+
+function updateModelOptions(models) {
+  adminModelOptions.innerHTML = "";
+  const seen = new Set();
+  models.forEach((model) => {
+    const id = String(model.id || "").trim();
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    const option = document.createElement("option");
+    option.value = id;
+    option.label = model.name && model.name !== id ? `${model.name} · ${id}` : id;
+    adminModelOptions.append(option);
   });
 }
 

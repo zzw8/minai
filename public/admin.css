@@ -133,6 +133,12 @@ button[type="submit"] {
   font-weight: 800;
 }
 
+button:disabled,
+.ghost-button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
 .auth-view {
   display: grid;
   min-height: calc(100vh - 140px);

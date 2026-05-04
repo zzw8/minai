@@ -47,26 +47,13 @@ IMAGE_EXTENSIONS = {
 MODEL_ALIASES = {
     "gpt-image-2": "gpt-image-2-all",
 }
-CURATED_MODEL_ORDER = [
-    "deepseek-v3-1-250821",
-    "gpt-5.1",
-    "gpt-4.1",
-    "claude-sonnet-4-5-20250929",
-    "gemini-2.5-pro",
-    "qwen3.6-plus",
-    "gpt-image-2-all",
-    "flux-schnell",
-]
-CURATED_MODEL_LABELS = {
-    "deepseek-v3-1-250821": "DeepSeek V3.1",
-    "gpt-5.1": "GPT-5.1",
-    "gpt-4.1": "GPT-4.1",
-    "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5",
-    "gemini-2.5-pro": "Gemini 2.5 Pro",
-    "qwen3.6-plus": "Qwen 3.6 Plus",
-    "gpt-image-2-all": "GPT Image 2 All（推荐绘图）",
-    "flux-schnell": "Flux Schnell（快速绘图）",
-}
+
+
+class ModelFetchError(Exception):
+    def __init__(self, status, message):
+        super().__init__(message)
+        self.status = status
+        self.message = message
 
 
 def load_env_file():
@@ -135,8 +122,7 @@ def normalize_model_id(model_id):
 
 
 def display_model_name(model_id):
-    model_id = normalize_model_id(model_id)
-    return CURATED_MODEL_LABELS.get(model_id, model_id)
+    return normalize_model_id(model_id)
 
 
 def strip_trailing_slash(value):
@@ -368,6 +354,10 @@ def update_provider_stats(provider_id, ok, status, usage=None, error_message="")
 
 
 def public_model(model):
+    if isinstance(model, str):
+        model = {"id": model}
+    if not isinstance(model, dict):
+        return None
     model_id = normalize_model_id(model.get("id"))
     if not model_id:
         return None
@@ -382,18 +372,60 @@ def public_model(model):
     }
 
 
-def is_openai_compatible_model(model):
-    endpoints = model.get("supported_endpoint_types") if isinstance(model.get("supported_endpoint_types"), list) else []
-    endpoint_text = " ".join(str(item).lower() for item in endpoints)
-    if "openai" in endpoint_text:
-        return True
-    if "image-generation" in endpoint_text or "dall-e-3" in endpoint_text:
-        return True
-    if clean_text(model.get("model_type"), 40) == "文本" and "对话" in str(model.get("tags") or ""):
-        return True
-    if clean_text(model.get("model_type"), 40) == "图像" and "dall-e-3格式" in str(model.get("tags") or ""):
-        return True
-    return False
+def public_models_from_upstream(upstream):
+    if isinstance(upstream, dict) and isinstance(upstream.get("data"), list):
+        raw_models = upstream.get("data")
+    elif isinstance(upstream, list):
+        raw_models = upstream
+    else:
+        raw_models = []
+
+    deduped_models = {}
+    for model in raw_models:
+        public = public_model(model)
+        if public:
+            deduped_models[public["id"]] = public
+    return list(deduped_models.values())
+
+
+def fetch_provider_model_payload(provider):
+    if not provider.get("apiKey"):
+        raise ModelFetchError(400, "请先填写 API Key 后再获取模型。")
+
+    request = urllib.request.Request(
+        models_url(provider),
+        headers={
+            "Accept": "application/json",
+            "Authorization": f'Bearer {provider["apiKey"]}',
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            upstream = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        error_text = error.read().decode("utf-8", "replace")
+        try:
+            error_json = json.loads(error_text)
+        except Exception:
+            error_json = {}
+        message = (
+            ((error_json.get("error") or {}).get("message") if isinstance(error_json.get("error"), dict) else None)
+            or error_json.get("message")
+            or f"模型列表请求失败，状态码 {error.code}"
+        )
+        raise ModelFetchError(error.code, message)
+    except Exception:
+        raise ModelFetchError(502, "无法获取模型列表，请检查 API Host、API Path、API Key 或服务器网络。")
+
+    models = public_models_from_upstream(upstream)
+    return {
+        "provider": public_provider(provider),
+        "defaultModel": display_model_name(provider.get("aiModel")),
+        "defaultModelId": normalize_model_id(provider.get("aiModel")),
+        "models": models,
+        "count": len(models),
+    }
 
 
 def is_image_model(model_id):
@@ -1219,6 +1251,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.handle_create_provider()
                 return
 
+            if method == "POST" and path == "/api/admin/models/preview":
+                self.handle_admin_model_preview()
+                return
+
             provider_prefix = "/api/admin/providers/"
             if path.startswith(provider_prefix):
                 provider_id = urllib.parse.unquote(path[len(provider_prefix) :])
@@ -1389,52 +1425,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, cached["payload"])
             return
 
-        request = urllib.request.Request(
-            models_url(provider),
-            headers={
-                "Accept": "application/json",
-                "Authorization": f'Bearer {provider["apiKey"]}',
-            },
-            method="GET",
-        )
         try:
-            with urllib.request.urlopen(request, timeout=60) as response:
-                upstream = json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as error:
-            error_text = error.read().decode("utf-8", "replace")
-            try:
-                error_json = json.loads(error_text)
-            except Exception:
-                error_json = {}
-            message = (
-                ((error_json.get("error") or {}).get("message") if isinstance(error_json.get("error"), dict) else None)
-                or error_json.get("message")
-                or f"模型列表请求失败，状态码 {error.code}"
-            )
-            self.send_json(error.code, {"error": message})
-            return
-        except Exception:
-            self.send_json(502, {"error": "无法获取模型列表，请检查 API Host、API Path 或服务器网络。"})
+            payload = fetch_provider_model_payload(provider)
+        except ModelFetchError as error:
+            self.send_json(error.status, {"error": error.message})
             return
 
-        raw_models = upstream.get("data") if isinstance(upstream.get("data"), list) else []
-        filtered = [model for model in raw_models if isinstance(model, dict) and is_openai_compatible_model(model)]
-        if not filtered:
-            filtered = [model for model in raw_models if isinstance(model, dict)]
-        deduped_models = {}
-        for model in filtered:
-            public = public_model(model)
-            if public:
-                deduped_models[public["id"]] = public
-        models = [deduped_models[model_id] for model_id in CURATED_MODEL_ORDER if model_id in deduped_models]
-        if not models:
-            models = list(deduped_models.values())[:8]
-        payload = {
-            "provider": public_provider(provider),
-            "defaultModel": display_model_name(provider.get("aiModel")),
-            "defaultModelId": normalize_model_id(provider.get("aiModel")),
-            "models": models,
-        }
         MODEL_CACHE.clear()
         MODEL_CACHE[cache_key] = {"expiresAt": time.time() + 10 * 60, "payload": payload}
         self.send_json(200, payload)
@@ -1615,6 +1611,29 @@ class Handler(BaseHTTPRequestHandler):
             providers[0]["isDefault"] = True
         save_providers(providers)
         self.send_json(200, {"ok": True})
+
+    def handle_admin_model_preview(self):
+        body = self.read_json_body()
+        provider_id = clean_text(body.get("providerId"), 80)
+        current = None
+        if provider_id:
+            current = next((provider for provider in list_providers() if provider.get("id") == provider_id), None)
+            if not current:
+                self.send_json(404, {"error": "API 通道不存在。"})
+                return
+
+        provider = self.provider_from_body(body, current)
+        if isinstance(provider, str):
+            self.send_json(400, {"error": provider})
+            return
+
+        try:
+            payload = fetch_provider_model_payload(provider)
+        except ModelFetchError as error:
+            self.send_json(error.status, {"error": error.message})
+            return
+
+        self.send_json(200, payload)
 
     def provider_from_body(self, body, current=None):
         provider = dict(current or new_provider({}))
