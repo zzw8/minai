@@ -1,0 +1,11 @@
+{
+  "name": "minai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A lightweight OpenAI-compatible AI chat site for 1H1G servers.",
+  "scripts": {
+    "start": "python server.py",
+    "start:linux": "python3 server.py",
+    "check": "python -m py_compile server.py"
+  }
+}

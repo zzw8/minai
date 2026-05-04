@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MinAI Admin</title>
+    <link rel="stylesheet" href="/admin.css?v=20260503-chatbox2" />
+  </head>
+  <body>
+    <main class="admin-shell">
+      <header class="admin-header">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><span></span></div>
+          <div>
+            <strong>MinAI Admin</strong>
+            <small id="adminStatus">Checking</small>
+          </div>
+        </div>
+        <nav class="admin-actions">
+          <a href="/" title="打开网站">网站</a>
+          <button id="logoutButton" type="button" class="ghost-button hidden">退出</button>
+        </nav>
+      </header>
+
+      <section id="setupView" class="auth-view hidden">
+        <form id="setupForm" class="auth-panel">
+          <h1>初始化管理员</h1>
+          <label>
+            管理员账号
+            <input name="username" autocomplete="username" required minlength="3" maxlength="32" />
+          </label>
+          <label>
+            显示名称
+            <input name="displayName" maxlength="40" />
+          </label>
+          <label>
+            登录密码
+            <input name="password" type="password" autocomplete="new-password" required minlength="8" />
+          </label>
+          <button type="submit">创建管理员</button>
+          <p class="form-message" id="setupMessage"></p>
+        </form>
+      </section>
+
+      <section id="loginView" class="auth-view hidden">
+        <form id="adminLoginForm" class="auth-panel">
+          <h1>管理员登录</h1>
+          <label>
+            账号
+            <input name="username" autocomplete="username" required />
+          </label>
+          <label>
+            密码
+            <input name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit">登录后台</button>
+          <p class="form-message" id="loginMessage"></p>
+        </form>
+      </section>
+
+      <section id="dashboardView" class="dashboard hidden">
+        <section class="panel settings-panel">
+          <div class="panel-heading">
+            <div>
+              <p>Settings</p>
+              <h1>站点变量</h1>
+            </div>
+            <span id="activeProviderBadge">API 通道</span>
+          </div>
+
+          <form id="settingsForm" class="settings-form">
+            <label>
+              站点名称
+              <input name="siteTitle" maxlength="40" />
+            </label>
+            <label class="full">
+              系统提示词
+              <textarea name="systemPrompt" rows="5"></textarea>
+            </label>
+            <label class="toggle-line full">
+              <input name="requireLogin" type="checkbox" />
+              <span>用户登录后才能使用对话</span>
+            </label>
+            <div class="form-row full">
+              <button type="submit">保存变量</button>
+              <p class="form-message" id="settingsMessage"></p>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel providers-panel">
+          <div class="panel-heading">
+            <div>
+              <p>Providers</p>
+              <h1>API 调用管理</h1>
+            </div>
+            <span id="providerCount">0 个通道</span>
+          </div>
+
+          <form id="createProviderForm" class="provider-form">
+            <label>
+              通道名称
+              <input name="name" placeholder="云雾 API" maxlength="60" />
+            </label>
+            <label>
+              API 模式
+              <select name="apiMode">
+                <option value="openai-compatible">OpenAI API 兼容</option>
+              </select>
+            </label>
+            <label>
+              API 密钥
+              <input name="apiKey" type="password" autocomplete="new-password" placeholder="Bearer Token" />
+            </label>
+            <label>
+              API 主机
+              <input name="apiHost" placeholder="https://yunwu.ai" />
+            </label>
+            <label>
+              API 路径
+              <input name="apiPath" placeholder="/v1/chat/completions" />
+            </label>
+            <label>
+              模型
+              <input name="aiModel" placeholder="deepseek-v3-1-250821" />
+            </label>
+            <label class="toggle-line">
+              <input name="enabled" type="checkbox" checked />
+              <span>启用</span>
+            </label>
+            <label class="toggle-line">
+              <input name="isDefault" type="checkbox" />
+              <span>设为默认</span>
+            </label>
+            <div class="provider-actions full">
+              <button type="submit">添加通道</button>
+              <button id="yunwuPresetButton" type="button" class="ghost-button">云雾预设</button>
+              <p class="form-message" id="providersMessage"></p>
+            </div>
+          </form>
+
+          <div class="providers-list" id="providersList"></div>
+        </section>
+
+        <section class="panel users-panel">
+          <div class="panel-heading">
+            <div>
+              <p>Users</p>
+              <h1>用户管理</h1>
+            </div>
+            <span id="userCount">0 users</span>
+          </div>
+
+          <form id="createUserForm" class="create-user-form">
+            <input name="username" placeholder="用户名" required minlength="3" maxlength="32" />
+            <input name="displayName" placeholder="显示名称" maxlength="40" />
+            <input name="password" type="password" placeholder="初始密码" required minlength="8" />
+            <select name="role">
+              <option value="user">用户</option>
+              <option value="admin">管理员</option>
+            </select>
+            <button type="submit">添加</button>
+          </form>
+          <p class="form-message" id="usersMessage"></p>
+
+          <div class="users-table" id="usersTable"></div>
+        </section>
+      </section>
+    </main>
+
+    <template id="userRowTemplate">
+      <form class="user-row">
+        <div class="user-identity">
+          <strong data-field="username"></strong>
+          <small data-field="meta"></small>
+        </div>
+        <input name="displayName" placeholder="显示名称" maxlength="40" />
+        <select name="role">
+          <option value="user">用户</option>
+          <option value="admin">管理员</option>
+        </select>
+        <select name="status">
+          <option value="active">启用</option>
+          <option value="disabled">禁用</option>
+        </select>
+        <input name="password" type="password" placeholder="新密码" minlength="8" />
+        <div class="row-actions">
+          <button type="submit">保存</button>
+          <button type="button" class="ghost-button delete-user">删除</button>
+        </div>
+      </form>
+    </template>
+
+    <template id="providerCardTemplate">
+      <form class="provider-card">
+        <div class="provider-top">
+          <div>
+            <strong data-field="name"></strong>
+            <small data-field="summary"></small>
+          </div>
+          <span data-field="badge"></span>
+        </div>
+        <div class="provider-grid">
+          <input name="name" placeholder="通道名称" maxlength="60" />
+          <select name="apiMode">
+            <option value="openai-compatible">OpenAI API 兼容</option>
+          </select>
+          <input name="apiKey" type="password" placeholder="新 Key，留空不改" />
+          <input name="apiHost" placeholder="API Host，例如 https://yunwu.ai" />
+          <input name="apiPath" placeholder="API Path，例如 /v1/chat/completions" />
+          <input name="aiModel" placeholder="模型名称" />
+          <label class="toggle-line compact">
+            <input name="enabled" type="checkbox" />
+            <span>启用</span>
+          </label>
+          <label class="toggle-line compact">
+            <input name="isDefault" type="checkbox" />
+            <span>默认</span>
+          </label>
+        </div>
+        <div class="metrics" data-field="metrics"></div>
+        <div class="provider-actions">
+          <button type="submit">保存</button>
+          <button type="button" class="ghost-button clear-provider-key">清空 Key</button>
+          <button type="button" class="ghost-button delete-provider">删除</button>
+        </div>
+      </form>
+    </template>
+
+    <script src="/admin.js?v=20260503-chatbox2" type="module"></script>
+  </body>
+</html>

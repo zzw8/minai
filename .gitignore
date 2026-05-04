@@ -1,0 +1,34 @@
+.env
+.env.*
+!.env.example
+
+# Runtime data and generated assets
+data/
+generated/
+screenshots/
+release/
+*.zip
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node / tooling leftovers
+node_modules/
+npm-debug.log*
+dist/
+
+# Local OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Deployment helpers that may contain credentials
+tools/askpass.cmd
+askpass.cmd
+
+# Legacy Node backend kept locally only; server.py is the supported backend.
+server.js
+public/assets/ai-avatar.svg

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MinAI</title>
+    <meta name="description" content="一个简约轻量的 AI 对话网站，适合部署在 1H1G 服务器。" />
+    <link rel="stylesheet" href="/styles.css?v=20260504-models-fast" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="side-panel" aria-label="会话">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <img src="/assets/ai-avatar.png" alt="" />
+          </div>
+          <div>
+            <strong id="brandName">MinAI</strong>
+            <small>Online</small>
+          </div>
+        </div>
+
+        <button class="new-chat" id="newChatButton" type="button" title="新对话">
+          <span aria-hidden="true">+</span>
+          <span>新对话</span>
+        </button>
+
+        <div class="conversation-section">
+          <div class="sidebar-label">最近对话</div>
+          <div class="conversation-list" id="conversationList" aria-label="历史对话"></div>
+        </div>
+        <div class="sidebar-space" aria-hidden="true"></div>
+        <a class="admin-link" href="/admin">后台管理</a>
+      </aside>
+
+      <section class="chat-panel" aria-label="AI 对话">
+        <header class="chat-header">
+          <div>
+            <p>AI Assistant</p>
+            <h1 id="siteHeading">把想法变清楚</h1>
+          </div>
+          <div class="header-actions">
+            <button class="theme-toggle" id="themeToggle" data-theme-toggle type="button" aria-label="切换深色模式" aria-pressed="false">
+              <span aria-hidden="true">☾</span>
+            </button>
+            <select class="model-select" id="modelSelect" aria-label="选择模型" disabled>
+              <option value="">默认模型</option>
+            </select>
+            <div class="account-menu" id="accountMenu">
+              <button class="auth-button" id="authButton" type="button" aria-haspopup="menu" aria-expanded="false">
+                登录
+              </button>
+              <div class="account-popover hidden" id="accountPopover" role="menu">
+                <div class="account-card">
+                  <span class="account-avatar" id="accountAvatar">U</span>
+                  <div>
+                    <strong id="accountName">用户</strong>
+                    <small id="accountStatus">Signed in</small>
+                  </div>
+                </div>
+                <a href="/admin" role="menuitem">后台管理</a>
+                <button id="logoutButton" type="button" role="menuitem">退出登录</button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="messages" id="messages" aria-live="polite"></div>
+
+        <form class="composer" id="chatForm">
+          <div class="attachment-tray hidden" id="attachmentTray"></div>
+          <input
+            class="file-input"
+            id="fileInput"
+            type="file"
+            multiple
+            accept=".txt,.md,.csv,.json,.js,.ts,.py,.html,.css,.xml,.yml,.yaml,.log,.sql,.vue,.jsx,.tsx,image/*"
+          />
+          <button class="attach-button" id="attachButton" type="button" title="上传文件">
+            <span aria-hidden="true">+</span>
+          </button>
+          <textarea
+            id="messageInput"
+            name="message"
+            rows="1"
+            placeholder="输入你的问题..."
+            autocomplete="off"
+          ></textarea>
+          <button id="sendButton" type="submit" title="发送">
+            <span>发送</span>
+          </button>
+        </form>
+      </section>
+    </main>
+
+    <div class="auth-modal hidden" id="authModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+      <form class="auth-box" id="loginForm">
+        <div class="auth-title">
+          <h2 id="loginTitle">用户登录</h2>
+          <button class="theme-toggle" data-theme-toggle type="button" aria-label="切换深色模式" aria-pressed="false">
+            <span aria-hidden="true">☾</span>
+          </button>
+        </div>
+        <label>
+          账号
+          <input name="username" autocomplete="username" required />
+        </label>
+        <label>
+          密码
+          <input name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <div class="auth-actions">
+          <button type="submit">登录</button>
+          <button class="ghost-button" id="closeAuthButton" type="button">稍后</button>
+        </div>
+        <p class="auth-error" id="loginError"></p>
+      </form>
+    </div>
+
+    <template id="messageTemplate">
+      <article class="message">
+        <div class="avatar"></div>
+        <div class="bubble"></div>
+      </article>
+    </template>
+
+    <script src="/app.js?v=20260504-models-fast" type="module"></script>
+  </body>
+</html>
