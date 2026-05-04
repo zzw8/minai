@@ -40,3 +40,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Publish MinAI project"
           git push
+
+# trigger: 2026-05-04T02:54:00Z
