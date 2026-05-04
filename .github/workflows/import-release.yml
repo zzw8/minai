@@ -54,4 +54,4 @@ jobs:
           git commit -m "Publish MinAI project"
           git push
 
-# trigger: actions-quota-20260504-1631
+# trigger: ui-compat-20260504-2227
