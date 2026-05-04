@@ -54,4 +54,4 @@ jobs:
           git commit -m "Publish MinAI project"
           git push
 
-# trigger: aapanel-readme-20260504-1521
+# trigger: model-access-20260504-1529
