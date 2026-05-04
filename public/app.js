@@ -33,6 +33,12 @@ const SIDEBAR_STORAGE_KEY = "minimal-ai-site/sidebar-collapsed";
 const MODEL_ALIASES = {
   "gpt-image-2": "gpt-image-2-all"
 };
+const COVER_FALLBACK_MODELS = [
+  { id: "deepseek-v3-1-250821", name: "DeepSeek V3.1", type: "Chat" },
+  { id: "gpt-4o-mini", name: "GPT-4o mini", type: "Chat" },
+  { id: "gpt-image-2-all", name: "GPT Image 2 All", type: "Image" },
+  { id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet", type: "Chat" }
+];
 let messages = loadLocalMessages();
 let conversations = [];
 let currentConversationId = "";
@@ -49,6 +55,8 @@ let activeAbortController = null;
 let config = {
   siteTitle: "MinAI",
   requireLogin: false,
+  coverModels: [],
+  coverDefaultModel: "",
   user: null
 };
 
@@ -227,7 +235,6 @@ document.addEventListener("keydown", (event) => {
 });
 
 closeAuthButton.addEventListener("click", () => {
-  if (config.requireLogin && !config.user) return;
   hideAuthModal();
 });
 
@@ -264,6 +271,7 @@ async function bootstrap() {
   } finally {
     updateSiteCopy();
     updateAuthUI();
+    await loadCoverModels();
     if (canUseChat()) {
       await Promise.all([loadModels(), loadConversation()]);
     }
@@ -363,12 +371,7 @@ function renderMessages() {
     const empty = document.createElement("div");
     empty.className = "empty-state";
     const locked = !canUseChat();
-    empty.innerHTML = `
-      <div>
-        <h2>${locked ? "请先登录" : "今天想聊点什么？"}</h2>
-        <p>${locked ? "登录后即可使用 AI，并自动保存你的对话。" : "旧对话会留在左侧，点新对话也不会覆盖它们。"}</p>
-      </div>
-    `;
+    empty.append(createCoverContent(locked));
     messagesEl.append(empty);
     requestAnimationFrame(() => messagesEl.classList.remove("is-rendering"));
     return;
@@ -381,6 +384,121 @@ function renderMessages() {
   messagesEl.append(fragment);
   scrollToBottom();
   requestAnimationFrame(() => messagesEl.classList.remove("is-rendering"));
+}
+
+function createCoverContent(locked) {
+  const cover = document.createElement("div");
+  cover.className = "cover-card";
+
+  const preview = document.createElement("section");
+  preview.className = "cover-preview";
+  preview.setAttribute("aria-hidden", "true");
+  preview.innerHTML = `
+    <div class="cover-window">
+      <span></span><span></span><span></span>
+    </div>
+    <div class="cover-message cover-message-user">帮我把需求整理成可执行方案</div>
+    <div class="cover-message cover-message-ai">已拆成目标、功能、部署和验收四部分。</div>
+    <div class="cover-signal"></div>
+  `;
+
+  const action = document.createElement("section");
+  action.className = "cover-action";
+  action.innerHTML = `
+    <span class="cover-kicker">MinAI</span>
+    <h2>${locked ? "登录后开始体验" : "今天想聊点什么？"}</h2>
+    <p>${locked ? "登录后即可使用真实 AI 模型，对话会自动保存，也可以上传文件和生成图片。" : "选择模型后直接开始，对话会保存到左侧，方便下次继续查看。"}</p>
+  `;
+
+  const cta = document.createElement("button");
+  cta.type = "button";
+  cta.className = "cover-cta";
+  cta.textContent = locked ? "体验一下" : "开始新对话";
+  cta.addEventListener("click", () => {
+    if (locked) {
+      showAuthModal();
+      return;
+    }
+    input.focus();
+  });
+
+  const links = document.createElement("div");
+  links.className = "cover-links";
+  links.append(cta);
+  const repoLink = document.createElement("a");
+  repoLink.className = "cover-repo-link";
+  repoLink.href = "https://github.com/zzw8/minai";
+  repoLink.target = "_blank";
+  repoLink.rel = "noopener";
+  repoLink.textContent = "查看 GitHub";
+  links.append(repoLink);
+  action.append(links);
+
+  const rail = document.createElement("section");
+  rail.className = "cover-models";
+  const models = visibleCoverModels();
+  const modelRows = [...models, ...models].map((model) => {
+    const type = escapeHtml(model.type || "Model");
+    const name = escapeHtml(model.name || model.id || "AI Model");
+    const id = escapeHtml(model.id || "");
+    return `
+      <div class="cover-model">
+        <strong>${name}</strong>
+        <span>${type}${id ? ` · ${id}` : ""}</span>
+      </div>
+    `;
+  }).join("");
+  rail.innerHTML = `
+    <div class="cover-model-heading">
+      <span>可用模型</span>
+      <small>${config.coverDefaultModel ? `默认 ${escapeHtml(config.coverDefaultModel)}` : "实时读取"}</small>
+    </div>
+    <div class="cover-model-scroll" aria-label="可用模型列表">
+      <div class="cover-model-track">${modelRows}</div>
+    </div>
+  `;
+
+  cover.append(preview, action, rail);
+  return cover;
+}
+
+async function loadCoverModels() {
+  try {
+    const response = await fetch("/api/cover-models");
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      config.coverModels = Array.isArray(data.models) ? data.models : [];
+      config.coverDefaultModel = data.defaultModel || data.defaultModelId || "";
+      return;
+    }
+  } catch {
+    // The cover can still render with local fallback names if the upstream model list is unavailable.
+  }
+  config.coverModels = [];
+  config.coverDefaultModel = "";
+}
+
+function visibleCoverModels() {
+  const source = Array.isArray(config.coverModels) && config.coverModels.length ? config.coverModels : COVER_FALLBACK_MODELS;
+  const seen = new Set();
+  return source
+    .map((model) => ({
+      id: normalizeModelId(model.id || ""),
+      name: model.name || displayCoverModelName(model.id),
+      type: model.type || "Model"
+    }))
+    .filter((model) => {
+      if (!model.id || seen.has(model.id)) return false;
+      seen.add(model.id);
+      return true;
+    })
+    .slice(0, 18);
+}
+
+function displayCoverModelName(modelId) {
+  return String(modelId || "AI Model")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function renderConversationList() {
@@ -686,8 +804,7 @@ function updateAuthUI() {
     hideAccountMenu();
   }
 
-  closeAuthButton.classList.toggle("hidden", Boolean(config.requireLogin && !config.user));
-  if (config.requireLogin && !config.user) showAuthModal();
+  closeAuthButton.classList.remove("hidden");
   updateInputState();
 }
 

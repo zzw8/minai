@@ -1338,6 +1338,10 @@ class Handler(BaseHTTPRequestHandler):
             self.handle_models()
             return
 
+        if method == "GET" and path == "/api/cover-models":
+            self.handle_cover_models()
+            return
+
         job_prefix = "/api/jobs/"
         if method == "GET" and path.startswith(job_prefix):
             self.handle_image_job(urllib.parse.unquote(path[len(job_prefix) :]))
@@ -1613,6 +1617,33 @@ class Handler(BaseHTTPRequestHandler):
         MODEL_CACHE.clear()
         MODEL_CACHE[cache_key] = {"expiresAt": time.time() + 10 * 60, "payload": payload}
         self.send_json(200, payload)
+
+    def handle_cover_models(self):
+        provider = get_active_provider()
+        if not provider:
+            self.send_json(200, {"defaultModel": "", "defaultModelId": "", "models": [], "count": 0})
+            return
+
+        cache_key = f'cover:{provider.get("id")}:{provider.get("apiHost")}:{provider.get("apiPath")}:{provider.get("updatedAt")}'
+        cached = MODEL_CACHE.get(cache_key)
+        if cached and cached["expiresAt"] > time.time():
+            self.send_json(200, cached["payload"])
+            return
+
+        try:
+            payload = fetch_provider_model_payload(provider, apply_access_filter=True)
+        except ModelFetchError:
+            self.send_json(200, {"defaultModel": "", "defaultModelId": "", "models": [], "count": 0})
+            return
+
+        public_payload = {
+            "defaultModel": payload.get("defaultModel") or "",
+            "defaultModelId": payload.get("defaultModelId") or "",
+            "models": (payload.get("models") or [])[:80],
+            "count": len(payload.get("models") or []),
+        }
+        MODEL_CACHE[cache_key] = {"expiresAt": time.time() + 10 * 60, "payload": public_payload}
+        self.send_json(200, public_payload)
 
     def handle_get_conversation(self):
         user = self.get_user_from_request()
