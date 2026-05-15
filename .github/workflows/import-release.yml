@@ -54,4 +54,4 @@ jobs:
           git commit -m "Publish MinAI project"
           git push
 
-# trigger: revert-cover-github-20260504-2300
+# trigger: doubao-ui-model-pill-20260515-2255
