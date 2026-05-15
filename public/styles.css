@@ -809,7 +809,7 @@ a {
   text-align: center;
 }
 
-.empty-state div {
+.empty-state > div {
   position: relative;
   width: min(620px, 100%);
   border: 1px solid var(--line-soft);
@@ -821,7 +821,7 @@ a {
   -webkit-backdrop-filter: blur(14px);
 }
 
-.empty-state div::before {
+.empty-state > div::before {
   display: grid;
   width: 50px;
   height: 50px;
@@ -1488,7 +1488,7 @@ a {
     padding: 18px;
   }
 
-  .empty-state div {
+  .empty-state > div {
     border-radius: 24px;
     padding: 30px 22px;
     backdrop-filter: none;
@@ -2265,5 +2265,139 @@ a {
   .account-popover {
     right: 0;
     width: min(286px, calc(100vw - 20px));
+  }
+}
+
+/* Smooth chat pass: instant cached switches and a quieter empty state. */
+.messages {
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  will-change: transform, opacity;
+}
+
+.messages.is-switching {
+  opacity: 0.88;
+  transform: translateY(2px);
+}
+
+.messages.is-entering {
+  animation: conversationEnter 140ms ease-out both;
+}
+
+.message {
+  content-visibility: auto;
+  contain-intrinsic-size: 92px;
+}
+
+.bubble,
+.conversation-row {
+  contain: layout paint style;
+}
+
+.empty-state {
+  min-height: 420px;
+  padding: clamp(22px, 5vw, 56px);
+  align-content: center;
+}
+
+.empty-state .welcome-card {
+  display: grid;
+  justify-items: center;
+  width: min(780px, 100%);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0 18px;
+}
+
+.empty-state .welcome-card::before {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  border-radius: 20px;
+  background: var(--surface-strong) url("/assets/ai-avatar.png") center / cover no-repeat;
+  box-shadow:
+    0 20px 70px color-mix(in srgb, var(--accent) 22%, transparent),
+    0 0 0 1px var(--line-soft);
+  color: transparent;
+}
+
+.welcome-kicker {
+  min-height: 30px;
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
+  color: var(--accent-strong);
+  padding: 0 13px;
+}
+
+.empty-state h2 {
+  max-width: 760px;
+  margin: 8px 0 12px;
+  font-size: clamp(36px, 5.2vw, 56px);
+  font-weight: 820;
+  line-height: 1.05;
+}
+
+.empty-state p {
+  max-width: 620px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.empty-actions {
+  display: grid;
+  width: min(720px, 100%);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 30px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.empty-actions::before {
+  display: none;
+  content: none;
+}
+
+.empty-actions button {
+  min-height: 52px;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-strong) 78%, transparent);
+  color: var(--text);
+  box-shadow: 0 18px 44px var(--shadow-soft);
+  font-size: 14px;
+}
+
+.empty-actions [data-empty-login] {
+  border-color: transparent;
+  background: var(--accent-gradient);
+  color: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .empty-state {
+    min-height: 360px;
+    padding: 24px 16px;
+  }
+
+  .empty-state h2 {
+    font-size: clamp(32px, 10vw, 42px);
+  }
+
+  .empty-actions {
+    grid-template-columns: 1fr;
+    width: min(360px, 100%);
+    gap: 8px;
+  }
+
+  .empty-actions button {
+    min-height: 48px;
   }
 }

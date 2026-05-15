@@ -37,6 +37,9 @@ const STORAGE_KEY = "minimal-ai-site/messages";
 const MODEL_STORAGE_KEY = "minimal-ai-site/model";
 const THEME_STORAGE_KEY = "minimal-ai-site/theme";
 const SIDEBAR_STORAGE_KEY = "minimal-ai-site/sidebar-collapsed";
+const CONVERSATION_CACHE_INDEX_KEY = "minimal-ai-site/conversation-cache-index";
+const CONVERSATION_CACHE_PREFIX = "minimal-ai-site/conversation-cache/";
+const CONVERSATION_CACHE_LIMIT = 16;
 const DEFAULT_IMAGE_MODEL = "gpt-image-2-all";
 const MODEL_ALIASES = {
   "gpt-image-2": DEFAULT_IMAGE_MODEL,
@@ -48,6 +51,7 @@ const MODEL_ALIASES = {
 };
 let messages = loadLocalMessages();
 let conversations = [];
+let conversationCache = new Map();
 let currentConversationId = "";
 let isSending = false;
 let isHydratingConversation = false;
@@ -169,8 +173,9 @@ conversationList.addEventListener("click", async (event) => {
   if (!button || isSending) return;
   const conversationId = button.dataset.selectConversation;
   if (!conversationId || conversationId === currentConversationId) return;
-  await selectConversation(conversationId);
+  const switchPromise = selectConversation(conversationId);
   collapseSidebarOnSmall();
+  await switchPromise;
 });
 
 modelSelect.addEventListener("change", () => {
@@ -267,6 +272,7 @@ authButton.addEventListener("click", () => {
 logoutButton.addEventListener("click", async () => {
   hideAccountMenu();
   await fetch("/api/auth/logout", { method: "POST" });
+  clearConversationCache();
   config.user = null;
   messages = [];
   conversations = [];
@@ -429,9 +435,13 @@ async function sendMessage() {
   }
 }
 
-function renderMessages() {
+function renderMessages(options = {}) {
   messagesEl.innerHTML = "";
   messagesEl.classList.add("is-rendering");
+  if (options.animate) {
+    messagesEl.classList.add("is-entering");
+    window.setTimeout(() => messagesEl.classList.remove("is-entering"), 170);
+  }
 
   if (!messages.length) {
     const empty = document.createElement("div");
@@ -441,7 +451,7 @@ function renderMessages() {
       <div class="welcome-card">
         <span class="welcome-kicker">${locked ? "登录后开始" : "随时开聊"}</span>
         <h2>${locked ? "登录后使用 AI" : "今天想聊点什么？"}</h2>
-        <p>${locked ? "你可以先查看界面，发送消息、上传文件和选择模型前会要求登录。" : "旧对话会留在左侧，切换和新建都不会覆盖当前内容。"}</p>
+        <p>${locked ? "登录后继续你的对话、文件和图片创作。" : "把问题、资料或想法丢进来，我会跟上你的节奏。"}</p>
         <div class="empty-actions">
           ${locked ? '<button type="button" data-empty-login>立即登录</button>' : ""}
           <button type="button" data-empty-tool="attach">文件分析</button>
@@ -1132,14 +1142,26 @@ async function createNewConversation() {
 
 async function selectConversation(conversationId) {
   const token = ++conversationSwitchToken;
+  const cachedMessages = loadCachedConversationMessages(conversationId);
   markConversationSwitch(conversationId);
-  messagesEl.classList.add("is-switching");
+  messagesEl.classList.toggle("is-switching", !cachedMessages);
   messagesEl.setAttribute("aria-busy", "true");
 
   try {
     await saveMessages(true).catch(() => null);
     if (token !== conversationSwitchToken) return;
     markConversationSwitch(conversationId);
+
+    let visibleSignature = messageSignature(messages);
+    if (cachedMessages) {
+      currentConversationId = conversationId;
+      messages = cachedMessages;
+      lastSavedMessagesSignature = messageSignature(messages);
+      visibleSignature = lastSavedMessagesSignature;
+      saveLocalMessages(messages);
+      renderConversationList();
+      renderMessages({ animate: true });
+    }
 
     const response = await fetch("/api/conversations/select", {
       method: "POST",
@@ -1150,10 +1172,11 @@ async function selectConversation(conversationId) {
     if (token !== conversationSwitchToken) return;
     if (response.ok) {
       applyConversationPayload(data);
-      messagesEl.classList.remove("is-switching");
-      messagesEl.classList.add("is-entering");
-      renderMessages();
-      await wait(160);
+      const freshSignature = messageSignature(messages);
+      if (!cachedMessages || freshSignature !== visibleSignature) {
+        messagesEl.classList.remove("is-switching");
+        renderMessages({ animate: true });
+      }
     }
   } finally {
     if (token === conversationSwitchToken) {
@@ -1214,6 +1237,7 @@ function applyConversationPayload(data) {
     JSON.stringify(conversations.map((item) => [item.id, item.title, item.pinned, item.updatedAt]));
   conversations = nextConversations;
   currentConversationId = data.conversationId || data.activeId || "";
+  cacheConversationMessages(currentConversationId, messages);
   saveLocalMessages(messages);
   lastSavedMessagesSignature = messageSignature(messages);
   if (listChanged) renderConversationList();
@@ -1223,6 +1247,7 @@ async function saveMessages(immediate = false) {
   const safeMessages = sanitizeMessages(messages);
   const persistMessages = safeMessages.filter((message) => !message.error);
   const snapshot = JSON.stringify(safeMessages);
+  cacheConversationMessages(currentConversationId, safeMessages);
   saveLocalMessages(safeMessages);
   if (!config.user || isHydratingConversation) return;
   if (snapshot === lastSavedMessagesSignature) return;
@@ -1363,6 +1388,83 @@ function fileToDataUrl(file) {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+function conversationCacheScope() {
+  return String(config.user?.id || config.user?.username || "guest");
+}
+
+function conversationCacheKey(conversationId) {
+  return `${CONVERSATION_CACHE_PREFIX}${conversationCacheScope()}/${conversationId}`;
+}
+
+function loadCachedConversationMessages(conversationId) {
+  if (!conversationId) return null;
+  if (conversationCache.has(conversationId)) return conversationCache.get(conversationId);
+  try {
+    const cached = sessionStorage.getItem(conversationCacheKey(conversationId));
+    if (!cached) return null;
+    const parsed = sanitizeMessages(JSON.parse(cached));
+    if (!parsed.length) return null;
+    conversationCache.set(conversationId, parsed);
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function cacheConversationMessages(conversationId, value) {
+  if (!config.user || !conversationId) return;
+  const safeMessages = sanitizeMessages(value);
+  conversationCache.set(conversationId, safeMessages);
+  try {
+    sessionStorage.setItem(conversationCacheKey(conversationId), JSON.stringify(safeMessages));
+    rememberConversationCacheKey(conversationId);
+  } catch {
+    const compact = safeMessages.map((message) => ({
+      ...message,
+      files: (message.files || []).map((file) => ({ ...file, dataUrl: "" }))
+    }));
+    try {
+      sessionStorage.setItem(conversationCacheKey(conversationId), JSON.stringify(compact));
+      rememberConversationCacheKey(conversationId);
+    } catch {
+      sessionStorage.removeItem(conversationCacheKey(conversationId));
+    }
+  }
+}
+
+function rememberConversationCacheKey(conversationId) {
+  const scopedIndexKey = `${CONVERSATION_CACHE_INDEX_KEY}/${conversationCacheScope()}`;
+  let ids = [];
+  try {
+    ids = JSON.parse(sessionStorage.getItem(scopedIndexKey) || "[]");
+  } catch {
+    ids = [];
+  }
+  const nextIds = [conversationId, ...ids.filter((id) => id !== conversationId)];
+  const staleIds = nextIds.slice(CONVERSATION_CACHE_LIMIT);
+  ids = nextIds.slice(0, CONVERSATION_CACHE_LIMIT);
+  try {
+    sessionStorage.setItem(scopedIndexKey, JSON.stringify(ids));
+    staleIds.forEach((id) => sessionStorage.removeItem(conversationCacheKey(id)));
+  } catch {
+    // Cache is an enhancement only; storage failures should not block chat.
+  }
+}
+
+function clearConversationCache() {
+  conversationCache = new Map();
+  try {
+    const prefix = `${CONVERSATION_CACHE_PREFIX}${conversationCacheScope()}/`;
+    Object.keys(sessionStorage).forEach((key) => {
+      if (key.startsWith(prefix) || key.startsWith(`${CONVERSATION_CACHE_INDEX_KEY}/`)) {
+        sessionStorage.removeItem(key);
+      }
+    });
+  } catch {
+    // Ignore unavailable sessionStorage.
+  }
 }
 
 function saveLocalMessages(value) {
