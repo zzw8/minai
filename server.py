@@ -39,6 +39,8 @@ DEFAULT_SYSTEM_PROMPT = "你是一个专业、简洁、友好的 AI 助手。请
 MODEL_CACHE = {}
 IMAGE_JOBS = {}
 IMAGE_JOBS_LOCK = threading.Lock()
+CONVERSATIONS_LOCK = threading.RLock()
+CONVERSATIONS_CACHE = {"mtime": None, "data": None}
 IMAGE_EXTENSIONS = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
@@ -48,6 +50,11 @@ IMAGE_EXTENSIONS = {
 }
 MODEL_ALIASES = {
     "gpt-image-2": "gpt-image-2-all",
+    "gpt-image-2all": "gpt-image-2-all",
+    "gpt-image-2 all": "gpt-image-2-all",
+    "image2all": "gpt-image-2-all",
+    "image2 all": "gpt-image-2-all",
+    "image2-all": "gpt-image-2-all",
 }
 
 
@@ -1058,6 +1065,20 @@ def normalize_messages(messages):
     return normalized[-16:]
 
 
+def persist_conversation_image_url(url):
+    if not isinstance(url, str):
+        return ""
+    url = url.strip()
+    if url.startswith("http://") or url.startswith("https://") or url.startswith("/generated/"):
+        return url
+    if url.startswith("data:image/"):
+        try:
+            return store_data_image(url)
+        except Exception:
+            return ""
+    return ""
+
+
 def conversation_messages(messages):
     if not isinstance(messages, list):
         return []
@@ -1069,30 +1090,28 @@ def conversation_messages(messages):
         content = clean_text(message.get("content"), 12000)
         images = message.get("images") if isinstance(message.get("images"), list) else []
         files = message.get("files") if isinstance(message.get("files"), list) else []
-        safe_images = [
-            str(url)
-            for url in images
-            if isinstance(url, str)
-            and (
-                url.startswith("http://")
-                or url.startswith("https://")
-                or url.startswith("/generated/")
-                or url.startswith("data:image/")
-            )
-        ][:4]
+        safe_images = []
+        for url in images:
+            safe_url = persist_conversation_image_url(url)
+            if safe_url:
+                safe_images.append(safe_url)
+            if len(safe_images) >= 4:
+                break
         safe_files = []
         for file in files[:6]:
             if not isinstance(file, dict):
                 continue
+            data_url = str(file.get("dataUrl") or "")
+            file_url = persist_conversation_image_url(file.get("url"))
+            if str(file.get("type") or "").startswith("image/") and data_url.startswith("data:image/"):
+                file_url = persist_conversation_image_url(data_url) or file_url
             safe_files.append(
                 {
                     "name": clean_text(file.get("name"), 120),
                     "type": clean_text(file.get("type"), 80),
                     "text": clean_text(file.get("text"), 60000),
-                    "dataUrl": clean_text(file.get("dataUrl"), 2_500_000)
-                    if str(file.get("type") or "").startswith("image/")
-                    and str(file.get("dataUrl") or "").startswith("data:image/")
-                    else "",
+                    "url": file_url,
+                    "dataUrl": "",
                 }
             )
         if content or safe_images or safe_files:
@@ -1101,8 +1120,32 @@ def conversation_messages(messages):
 
 
 def read_conversations():
-    data = read_json(CONVERSATIONS_PATH, {})
-    return data if isinstance(data, dict) else {}
+    with CONVERSATIONS_LOCK:
+        try:
+            mtime = CONVERSATIONS_PATH.stat().st_mtime_ns
+        except FileNotFoundError:
+            CONVERSATIONS_CACHE["mtime"] = None
+            CONVERSATIONS_CACHE["data"] = {}
+            return {}
+        if CONVERSATIONS_CACHE.get("mtime") == mtime and isinstance(CONVERSATIONS_CACHE.get("data"), dict):
+            return CONVERSATIONS_CACHE["data"]
+        data = read_json(CONVERSATIONS_PATH, {})
+        if not isinstance(data, dict):
+            data = {}
+        CONVERSATIONS_CACHE["mtime"] = mtime
+        CONVERSATIONS_CACHE["data"] = data
+        return data
+
+
+def write_conversations(data):
+    with CONVERSATIONS_LOCK:
+        payload = data if isinstance(data, dict) else {}
+        write_json(CONVERSATIONS_PATH, payload)
+        CONVERSATIONS_CACHE["data"] = payload
+        try:
+            CONVERSATIONS_CACHE["mtime"] = CONVERSATIONS_PATH.stat().st_mtime_ns
+        except FileNotFoundError:
+            CONVERSATIONS_CACHE["mtime"] = None
 
 
 def conversation_title(messages):
@@ -1174,20 +1217,16 @@ def conversation_summary(item):
 
 def get_user_conversation_store(user_id):
     data = read_conversations()
-    store = normalize_user_conversation_store(data.get(str(user_id)))
-    data[str(user_id)] = store
-    write_json(CONVERSATIONS_PATH, data)
-    return store
+    return normalize_user_conversation_store(data.get(str(user_id)))
 
 
 def save_user_conversation_store(user_id, store):
-    data = read_conversations()
+    data = dict(read_conversations())
     data[str(user_id)] = normalize_user_conversation_store(store)
-    write_json(CONVERSATIONS_PATH, data)
+    write_conversations(data)
 
 
-def user_conversation_payload(user_id):
-    store = get_user_conversation_store(user_id)
+def conversation_payload_from_store(store):
     active = next((item for item in store["items"] if item["id"] == store["activeId"]), None)
     return {
         "activeId": store["activeId"],
@@ -1195,6 +1234,10 @@ def user_conversation_payload(user_id):
         "messages": active["messages"] if active else [],
         "conversations": [conversation_summary(item) for item in store["items"]],
     }
+
+
+def user_conversation_payload(user_id):
+    return conversation_payload_from_store(get_user_conversation_store(user_id))
 
 
 def get_user_conversation(user_id):
@@ -1229,7 +1272,7 @@ def upsert_user_conversation(user_id, conversation_id, messages):
     item["updatedAt"] = now
     store["activeId"] = item["id"]
     save_user_conversation_store(user_id, store)
-    return user_conversation_payload(user_id)
+    return conversation_payload_from_store(store)
 
 
 def create_user_conversation(user_id):
@@ -1239,7 +1282,7 @@ def create_user_conversation(user_id):
     store["items"].insert(0, item)
     store["activeId"] = item["id"]
     save_user_conversation_store(user_id, store)
-    return user_conversation_payload(user_id)
+    return conversation_payload_from_store(store)
 
 
 def select_user_conversation(user_id, conversation_id):
@@ -1249,7 +1292,7 @@ def select_user_conversation(user_id, conversation_id):
         return None
     store["activeId"] = conversation_id
     save_user_conversation_store(user_id, store)
-    return user_conversation_payload(user_id)
+    return conversation_payload_from_store(store)
 
 
 def set_user_conversation_pinned(user_id, conversation_id, pinned):
@@ -1260,7 +1303,7 @@ def set_user_conversation_pinned(user_id, conversation_id, pinned):
         return None
     item["pinned"] = bool(pinned)
     save_user_conversation_store(user_id, store)
-    return user_conversation_payload(user_id)
+    return conversation_payload_from_store(store)
 
 
 def delete_user_conversation(user_id, conversation_id):
@@ -1273,7 +1316,7 @@ def delete_user_conversation(user_id, conversation_id):
     if store.get("activeId") == conversation_id:
         store["activeId"] = store["items"][0]["id"] if store["items"] else ""
     save_user_conversation_store(user_id, store)
-    return user_conversation_payload(user_id)
+    return conversation_payload_from_store(store)
 
 
 def is_valid_http_url(value):

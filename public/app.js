@@ -37,8 +37,14 @@ const STORAGE_KEY = "minimal-ai-site/messages";
 const MODEL_STORAGE_KEY = "minimal-ai-site/model";
 const THEME_STORAGE_KEY = "minimal-ai-site/theme";
 const SIDEBAR_STORAGE_KEY = "minimal-ai-site/sidebar-collapsed";
+const DEFAULT_IMAGE_MODEL = "gpt-image-2-all";
 const MODEL_ALIASES = {
-  "gpt-image-2": "gpt-image-2-all"
+  "gpt-image-2": DEFAULT_IMAGE_MODEL,
+  "gpt-image-2all": DEFAULT_IMAGE_MODEL,
+  "gpt-image-2 all": DEFAULT_IMAGE_MODEL,
+  "image2all": DEFAULT_IMAGE_MODEL,
+  "image2 all": DEFAULT_IMAGE_MODEL,
+  "image2-all": DEFAULT_IMAGE_MODEL
 };
 let messages = loadLocalMessages();
 let conversations = [];
@@ -534,13 +540,13 @@ function addMessageElement(role, content, isError = false, images = [], files = 
       fileList.append(item);
     });
     bubble.append(fileList);
-    const previews = files.filter((file) => file.dataUrl && file.type?.startsWith("image/")).slice(0, 4);
+    const previews = files.filter((file) => (file.dataUrl || file.url) && file.type?.startsWith("image/")).slice(0, 4);
     if (previews.length) {
       const gallery = document.createElement("div");
       gallery.className = "image-gallery";
       previews.forEach((file) => {
         const image = document.createElement("img");
-        image.src = file.dataUrl;
+        image.src = file.dataUrl || file.url;
         image.alt = file.name || "上传图片";
         image.loading = "lazy";
         gallery.append(image);
@@ -835,7 +841,9 @@ function handleToolAction(action) {
 }
 
 function selectFirstImageModel() {
-  const imageOption = [...modelSelect.options].find((option) =>
+  const options = [...modelSelect.options];
+  const preferredOption = options.find((option) => normalizeModelId(option.value) === DEFAULT_IMAGE_MODEL);
+  const imageOption = preferredOption || options.find((option) =>
     option.value && isImageModel(`${option.value} ${option.textContent || ""}`)
   );
   if (!imageOption) return;
@@ -1273,6 +1281,11 @@ function sanitizeMessages(source) {
               name: String(file.name || "").slice(0, 120),
               type: String(file.type || "").slice(0, 80),
               text: String(file.text || "").slice(0, 60000),
+              url:
+                typeof file.url === "string" &&
+                (file.url.startsWith("http://") || file.url.startsWith("https://") || file.url.startsWith("/generated/"))
+                  ? file.url
+                  : "",
               dataUrl:
                 String(file.type || "").startsWith("image/") && String(file.dataUrl || "").startsWith("data:image/")
                   ? String(file.dataUrl).slice(0, 2500000)
