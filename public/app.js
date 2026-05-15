@@ -6,6 +6,8 @@ const messagesEl = document.querySelector("#messages");
 const template = document.querySelector("#messageTemplate");
 const newChatButton = document.querySelector("#newChatButton");
 const sidebarToggle = document.querySelector("#sidebarToggle");
+const mobileSidebarButton = document.querySelector("#mobileSidebarButton");
+const sidebarBackdrop = document.querySelector("#sidebarBackdrop");
 const authButton = document.querySelector("#authButton");
 const accountMenu = document.querySelector("#accountMenu");
 const authModal = document.querySelector("#authModal");
@@ -15,6 +17,10 @@ const loginError = document.querySelector("#loginError");
 const brandName = document.querySelector("#brandName");
 const siteHeading = document.querySelector("#siteHeading");
 const modelSelect = document.querySelector("#modelSelect");
+const modelPicker = document.querySelector("#modelPicker");
+const modelPickerButton = document.querySelector("#modelPickerButton");
+const modelPickerLabel = document.querySelector("#modelPickerLabel");
+const modelPopover = document.querySelector("#modelPopover");
 const themeToggles = [...document.querySelectorAll("[data-theme-toggle]")];
 const accountPopover = document.querySelector("#accountPopover");
 const accountName = document.querySelector("#accountName");
@@ -25,6 +31,7 @@ const conversationList = document.querySelector("#conversationList");
 const fileInput = document.querySelector("#fileInput");
 const attachButton = document.querySelector("#attachButton");
 const attachmentTray = document.querySelector("#attachmentTray");
+const composerTools = document.querySelector("#composerTools");
 
 const STORAGE_KEY = "minimal-ai-site/messages";
 const MODEL_STORAGE_KEY = "minimal-ai-site/model";
@@ -43,7 +50,9 @@ let selectedModel = normalizeModelId(localStorage.getItem(MODEL_STORAGE_KEY) || 
 let conversationSwitchToken = 0;
 let pendingFiles = [];
 let currentTheme = localStorage.getItem(THEME_STORAGE_KEY) || preferredTheme();
-let sidebarCollapsed = localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true";
+let storedSidebarPreference = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+let sidebarCollapsed =
+  storedSidebarPreference === null ? window.matchMedia?.("(max-width: 900px)").matches : storedSidebarPreference === "true";
 let lastSavedMessagesSignature = messageSignature(messages);
 let activeAbortController = null;
 let config = {
@@ -109,6 +118,7 @@ newChatButton?.addEventListener("click", async () => {
   await wait(160);
   await createNewConversation();
   renderMessages();
+  collapseSidebarOnSmall();
   input.focus();
   await wait(240);
   messagesEl.classList.remove("is-resetting");
@@ -118,6 +128,21 @@ newChatButton?.addEventListener("click", async () => {
 sidebarToggle?.addEventListener("click", () => {
   sidebarCollapsed = !sidebarCollapsed;
   localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
+  storedSidebarPreference = String(sidebarCollapsed);
+  applySidebarState();
+});
+
+mobileSidebarButton?.addEventListener("click", () => {
+  sidebarCollapsed = false;
+  localStorage.setItem(SIDEBAR_STORAGE_KEY, "false");
+  storedSidebarPreference = "false";
+  applySidebarState();
+});
+
+sidebarBackdrop?.addEventListener("click", () => {
+  sidebarCollapsed = true;
+  localStorage.setItem(SIDEBAR_STORAGE_KEY, "true");
+  storedSidebarPreference = "true";
   applySidebarState();
 });
 
@@ -139,12 +164,25 @@ conversationList.addEventListener("click", async (event) => {
   const conversationId = button.dataset.selectConversation;
   if (!conversationId || conversationId === currentConversationId) return;
   await selectConversation(conversationId);
+  collapseSidebarOnSmall();
 });
 
 modelSelect.addEventListener("change", () => {
   selectedModel = normalizeModelId(modelSelect.value);
   modelSelect.value = selectedModel;
   localStorage.setItem(MODEL_STORAGE_KEY, selectedModel);
+  syncModelPicker();
+});
+
+modelPickerButton?.addEventListener("click", () => {
+  if (modelPickerButton.disabled) return;
+  toggleModelPicker();
+});
+
+modelPopover?.addEventListener("click", (event) => {
+  const option = event.target.closest("[data-model-value]");
+  if (!option) return;
+  selectModel(option.dataset.modelValue || "");
 });
 
 themeToggles.forEach((button) => {
@@ -181,7 +219,25 @@ attachmentTray.addEventListener("click", (event) => {
   renderPendingFiles();
 });
 
+composerTools?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-tool-action]");
+  if (!button) return;
+  handleToolAction(button.dataset.toolAction);
+});
+
 messagesEl.addEventListener("click", async (event) => {
+  const loginButton = event.target.closest("[data-empty-login]");
+  if (loginButton) {
+    showAuthModal();
+    return;
+  }
+
+  const toolButton = event.target.closest("[data-empty-tool]");
+  if (toolButton) {
+    handleToolAction(toolButton.dataset.emptyTool);
+    return;
+  }
+
   const copyButton = event.target.closest("[data-copy-message]");
   if (copyButton) {
     await copyAssistantMessage(Number(copyButton.dataset.copyMessage), copyButton);
@@ -220,14 +276,26 @@ document.addEventListener("click", (event) => {
   if (!accountPopover.classList.contains("hidden") && !event.target.closest("#accountMenu")) {
     hideAccountMenu();
   }
+  if (!event.target.closest("#modelPicker")) {
+    closeModelPicker();
+  }
+});
+
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 900 && sidebarCollapsed && storedSidebarPreference === null) {
+    sidebarCollapsed = false;
+    applySidebarState();
+  }
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") hideAccountMenu();
+  if (event.key === "Escape") {
+    hideAccountMenu();
+    closeModelPicker();
+  }
 });
 
 closeAuthButton.addEventListener("click", () => {
-  if (config.requireLogin && !config.user) return;
   hideAuthModal();
 });
 
@@ -364,9 +432,15 @@ function renderMessages() {
     empty.className = "empty-state";
     const locked = !canUseChat();
     empty.innerHTML = `
-      <div>
-        <h2>${locked ? "请先登录" : "今天想聊点什么？"}</h2>
-        <p>${locked ? "登录后即可使用 AI，并自动保存你的对话。" : "旧对话会留在左侧，点新对话也不会覆盖它们。"}</p>
+      <div class="welcome-card">
+        <span class="welcome-kicker">${locked ? "登录后开始" : "随时开聊"}</span>
+        <h2>${locked ? "登录后使用 AI" : "今天想聊点什么？"}</h2>
+        <p>${locked ? "你可以先查看界面，发送消息、上传文件和选择模型前会要求登录。" : "旧对话会留在左侧，切换和新建都不会覆盖当前内容。"}</p>
+        <div class="empty-actions">
+          ${locked ? '<button type="button" data-empty-login>立即登录</button>' : ""}
+          <button type="button" data-empty-tool="attach">文件分析</button>
+          <button type="button" data-empty-tool="image">图片创作</button>
+        </div>
       </div>
     `;
     messagesEl.append(empty);
@@ -667,9 +741,21 @@ function applyTheme(theme) {
 
 function applySidebarState() {
   appShell.classList.toggle("sidebar-collapsed", sidebarCollapsed);
-  sidebarToggle.setAttribute("aria-expanded", String(!sidebarCollapsed));
-  sidebarToggle.title = sidebarCollapsed ? "展开对话栏" : "收起对话栏";
-  sidebarToggle.setAttribute("aria-label", sidebarToggle.title);
+  sidebarToggle?.setAttribute("aria-expanded", String(!sidebarCollapsed));
+  if (sidebarToggle) {
+    sidebarToggle.title = sidebarCollapsed ? "展开对话栏" : "收起对话栏";
+    sidebarToggle.setAttribute("aria-label", sidebarToggle.title);
+  }
+  mobileSidebarButton?.setAttribute("aria-expanded", String(!sidebarCollapsed));
+  sidebarBackdrop?.setAttribute("aria-hidden", String(sidebarCollapsed));
+}
+
+function collapseSidebarOnSmall() {
+  if (!window.matchMedia?.("(max-width: 900px)").matches) return;
+  sidebarCollapsed = true;
+  localStorage.setItem(SIDEBAR_STORAGE_KEY, "true");
+  storedSidebarPreference = "true";
+  applySidebarState();
 }
 
 function updateAuthUI() {
@@ -686,8 +772,8 @@ function updateAuthUI() {
     hideAccountMenu();
   }
 
-  closeAuthButton.classList.toggle("hidden", Boolean(config.requireLogin && !config.user));
-  if (config.requireLogin && !config.user) showAuthModal();
+  appShell.classList.toggle("is-locked", !canUseChat());
+  closeAuthButton.classList.remove("hidden");
   updateInputState();
 }
 
@@ -706,12 +792,57 @@ function hideAccountMenu() {
 
 function updateInputState() {
   const locked = !canUseChat();
-  input.disabled = isSending || locked;
-  sendButton.disabled = locked;
+  input.disabled = isSending;
+  sendButton.disabled = isSending;
   attachButton.disabled = isSending || locked;
   modelSelect.disabled = isSending || locked || modelSelect.options.length <= 1;
-  input.placeholder = locked ? "请先登录..." : "输入你的问题...";
+  if (modelPickerButton) {
+    modelPickerButton.disabled = modelSelect.disabled;
+    modelPicker?.classList.toggle("is-disabled", modelPickerButton.disabled);
+    if (modelPickerButton.disabled) closeModelPicker();
+  }
+  syncModelPicker();
+  input.placeholder = locked ? "登录后即可发送消息..." : "输入你的问题...";
   sendButton.title = isSending ? "停止生成" : "发送";
+}
+
+function handleToolAction(action) {
+  if (action === "clear") {
+    input.value = "";
+    pendingFiles = [];
+    renderPendingFiles();
+    resizeInput();
+    input.focus();
+    return;
+  }
+
+  if (!canUseChat()) {
+    showAuthModal();
+    return;
+  }
+
+  if (action === "attach") {
+    fileInput.click();
+    return;
+  }
+
+  if (action === "image") {
+    selectFirstImageModel();
+    if (!input.value.trim()) input.value = "帮我生成一张";
+    resizeInput();
+    input.focus();
+  }
+}
+
+function selectFirstImageModel() {
+  const imageOption = [...modelSelect.options].find((option) =>
+    option.value && isImageModel(`${option.value} ${option.textContent || ""}`)
+  );
+  if (!imageOption) return;
+  selectedModel = normalizeModelId(imageOption.value);
+  modelSelect.value = selectedModel;
+  localStorage.setItem(MODEL_STORAGE_KEY, selectedModel);
+  syncModelPicker();
 }
 
 function canUseChat() {
@@ -793,7 +924,78 @@ function renderModelOptions(models, defaultLabel = "默认模型") {
   } else if (selectedModel !== localStorage.getItem(MODEL_STORAGE_KEY)) {
     localStorage.setItem(MODEL_STORAGE_KEY, selectedModel);
   }
+  renderModelPickerOptions();
   updateInputState();
+}
+
+function renderModelPickerOptions() {
+  if (!modelPopover) return;
+  modelPopover.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+  const options = [...modelSelect.options];
+
+  options.forEach((option) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "model-choice";
+    button.dataset.modelValue = option.value || "";
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", String(option.value === modelSelect.value));
+
+    const name = document.createElement("span");
+    name.className = "model-choice-name";
+    name.textContent = option.textContent || "默认模型";
+
+    const meta = document.createElement("small");
+    meta.textContent = option.value ? modelTypeLabel(option.value, option.parentElement?.label) : "默认通道";
+
+    button.append(name, meta);
+    fragment.append(button);
+  });
+
+  modelPopover.append(fragment);
+  syncModelPicker();
+}
+
+function syncModelPicker() {
+  if (!modelPickerLabel || !modelPopover) return;
+  const selectedOption = modelSelect.selectedOptions?.[0] || modelSelect.options[0];
+  modelPickerLabel.textContent = selectedOption?.textContent || "默认模型";
+  modelPopover.querySelectorAll("[data-model-value]").forEach((option) => {
+    const selected = option.dataset.modelValue === (modelSelect.value || "");
+    option.classList.toggle("active", selected);
+    option.setAttribute("aria-selected", String(selected));
+  });
+}
+
+function selectModel(value) {
+  selectedModel = normalizeModelId(value);
+  modelSelect.value = selectedModel;
+  if (selectedModel) {
+    localStorage.setItem(MODEL_STORAGE_KEY, selectedModel);
+  } else {
+    localStorage.removeItem(MODEL_STORAGE_KEY);
+  }
+  syncModelPicker();
+  closeModelPicker();
+}
+
+function toggleModelPicker(forceOpen) {
+  if (!modelPopover || !modelPickerButton) return;
+  const nextOpen = typeof forceOpen === "boolean" ? forceOpen : modelPopover.classList.contains("hidden");
+  modelPopover.classList.toggle("hidden", !nextOpen);
+  modelPicker?.classList.toggle("is-open", nextOpen);
+  modelPickerButton.setAttribute("aria-expanded", String(nextOpen));
+}
+
+function closeModelPicker() {
+  toggleModelPicker(false);
+}
+
+function modelTypeLabel(modelId, groupLabel) {
+  if (isImageModel(modelId)) return "图片模型";
+  if (groupLabel && groupLabel !== "模型") return groupLabel;
+  return "对话模型";
 }
 
 function normalizeModelId(modelId) {
@@ -1088,7 +1290,7 @@ function renderPendingFiles() {
   attachmentTray.classList.toggle("hidden", !pendingFiles.length);
   pendingFiles.forEach((file, index) => {
     const chip = document.createElement("span");
-    chip.className = "file-chip";
+    chip.className = "attachment-chip";
     if (file.type?.startsWith("image/")) chip.classList.add("image-file");
     chip.innerHTML = `
       <span>${escapeHtml(file.name || "附件")}</span>
@@ -1151,7 +1353,19 @@ function fileToDataUrl(file) {
 }
 
 function saveLocalMessages(value) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    const compact = sanitizeMessages(value).map((message) => ({
+      ...message,
+      files: (message.files || []).map((file) => ({ ...file, dataUrl: "" }))
+    }));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(compact));
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }
 }
 
 function loadLocalMessages() {

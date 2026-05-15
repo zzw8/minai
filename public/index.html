@@ -6,7 +6,7 @@
     <title>MinAI</title>
     <meta name="description" content="一个简约轻量的 AI 对话网站，适合部署在 1H1G 服务器。" />
     <link rel="icon" href="/assets/ai-avatar.png" />
-    <link rel="stylesheet" href="/styles.css?v=20260504-ui-revert-github" />
+    <link rel="stylesheet" href="/styles.css?v=20260515-doubao-ui" />
   </head>
   <body>
     <main class="app-shell" id="appShell">
@@ -37,18 +37,30 @@
         <a class="admin-link" href="/admin">后台管理</a>
         <a class="repo-link" href="https://github.com/zzw8/minai" target="_blank" rel="noopener">GitHub 仓库</a>
       </aside>
+      <button class="sidebar-backdrop" id="sidebarBackdrop" type="button" aria-label="关闭对话栏"></button>
 
       <section class="chat-panel" aria-label="AI 对话">
         <header class="chat-header">
-          <div>
-            <p>AI Assistant</p>
-            <h1 id="siteHeading">把想法变清楚</h1>
+          <div class="header-title">
+            <button class="mobile-sidebar-button" id="mobileSidebarButton" type="button" aria-label="打开对话栏">
+              <span></span>
+            </button>
+            <div>
+              <p>AI Assistant</p>
+              <h1 id="siteHeading">把想法变清楚</h1>
+            </div>
           </div>
           <div class="header-actions">
             <button class="theme-toggle" id="themeToggle" data-theme-toggle type="button" aria-label="切换深色模式" aria-pressed="false">
               <span aria-hidden="true">☾</span>
             </button>
-            <select class="model-select" id="modelSelect" aria-label="选择模型" disabled>
+            <div class="model-picker" id="modelPicker">
+              <button class="model-pill" id="modelPickerButton" type="button" aria-haspopup="listbox" aria-expanded="false" disabled>
+                <span id="modelPickerLabel">默认模型</span>
+              </button>
+              <div class="model-popover hidden" id="modelPopover" role="listbox" aria-label="选择模型"></div>
+            </div>
+            <select class="model-select native-model-select" id="modelSelect" aria-label="选择模型" disabled>
               <option value="">默认模型</option>
             </select>
             <div class="account-menu" id="accountMenu">
@@ -74,6 +86,11 @@
 
         <form class="composer" id="chatForm">
           <div class="attachment-tray hidden" id="attachmentTray"></div>
+          <div class="composer-tools" id="composerTools" aria-label="常用工具">
+            <button type="button" data-tool-action="attach">文件</button>
+            <button type="button" data-tool-action="image">图片创作</button>
+            <button type="button" data-tool-action="clear">清空输入</button>
+          </div>
           <input
             class="file-input"
             id="fileInput"
@@ -129,6 +146,6 @@
       </article>
     </template>
 
-    <script src="/app.js?v=20260504-ui-revert-github" type="module"></script>
+    <script src="/app.js?v=20260515-doubao-ui" type="module"></script>
   </body>
 </html>
