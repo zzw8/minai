@@ -1272,6 +1272,12 @@ a {
   color: var(--text);
 }
 
+:root[data-theme="dark"] .auth-actions .ghost-button {
+  color: var(--text);
+  border-color: var(--line);
+  background: var(--control-bg);
+}
+
 .auth-error {
   min-height: 20px;
   margin: 12px 0 0;
@@ -2295,8 +2301,8 @@ a {
 }
 
 .empty-state {
-  min-height: 420px;
-  padding: clamp(22px, 5vw, 56px);
+  min-height: 340px;
+  padding: clamp(18px, 4vw, 42px);
   align-content: center;
 }
 
@@ -2331,32 +2337,40 @@ a {
 }
 
 .empty-state h2 {
-  max-width: 760px;
-  margin: 8px 0 12px;
-  font-size: clamp(36px, 5.2vw, 56px);
+  max-width: 720px;
+  margin: 8px 0 10px;
+  font-size: clamp(34px, 4.6vw, 52px);
   font-weight: 820;
-  line-height: 1.05;
+  line-height: 1.08;
 }
 
 .empty-state p {
-  max-width: 620px;
+  max-width: 560px;
   color: var(--muted);
-  font-size: 16px;
-  line-height: 1.75;
+  font-size: 15px;
+  line-height: 1.7;
 }
 
 .empty-actions {
   display: grid;
-  width: min(720px, 100%);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(660px, 100%);
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
   gap: 10px;
-  margin-top: 30px;
+  margin-top: 24px;
   border: 0;
   background: transparent;
   box-shadow: none;
   padding: 0;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+.empty-actions.empty-actions--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.empty-actions.empty-actions--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .empty-actions::before {
@@ -2383,12 +2397,12 @@ a {
 
 @media (max-width: 640px) {
   .empty-state {
-    min-height: 360px;
-    padding: 24px 16px;
+    min-height: 320px;
+    padding: 20px 16px;
   }
 
   .empty-state h2 {
-    font-size: clamp(32px, 10vw, 42px);
+    font-size: clamp(30px, 9vw, 40px);
   }
 
   .empty-actions {

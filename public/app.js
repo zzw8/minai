@@ -452,7 +452,7 @@ function renderMessages(options = {}) {
         <span class="welcome-kicker">${locked ? "登录后开始" : "随时开聊"}</span>
         <h2>${locked ? "登录后使用 AI" : "今天想聊点什么？"}</h2>
         <p>${locked ? "登录后继续你的对话、文件和图片创作。" : "把问题、资料或想法丢进来，我会跟上你的节奏。"}</p>
-        <div class="empty-actions">
+        <div class="empty-actions ${locked ? "empty-actions--three" : "empty-actions--two"}">
           ${locked ? '<button type="button" data-empty-login>立即登录</button>' : ""}
           <button type="button" data-empty-tool="attach">文件分析</button>
           <button type="button" data-empty-tool="image">图片创作</button>
